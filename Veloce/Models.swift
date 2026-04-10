@@ -9,6 +9,7 @@ struct Category: Identifiable, Codable, Equatable {
     var budget: Double
     var spent: Double
     var colorHex: String
+    var isHidden: Bool
 
     init(
         id: UUID = UUID(),
@@ -16,7 +17,8 @@ struct Category: Identifiable, Codable, Equatable {
         icon: String,
         budget: Double,
         spent: Double = 0,
-        colorHex: String = "7B6FF0"
+        colorHex: String = "7B6FF0",
+        isHidden: Bool = false
     ) {
         self.id = id
         self.name = name
@@ -24,6 +26,7 @@ struct Category: Identifiable, Codable, Equatable {
         self.budget = budget
         self.spent = spent
         self.colorHex = colorHex
+        self.isHidden = isHidden
     }
 
     var spentRatio: Double {

@@ -2,6 +2,7 @@ import SwiftUI
 
 struct CategoryDetailSheet: View {
     @EnvironmentObject var vm: ExpenseViewModel
+    @EnvironmentObject var subManager: SubscriptionManager
     @Environment(\.dismiss) private var dismiss
 
     let category: Category
@@ -9,6 +10,7 @@ struct CategoryDetailSheet: View {
     @State private var editingBudget  = false
     @State private var budgetInput    = ""
     @State private var editingExpense: Expense? = nil
+    @State private var showPaywall    = false
 
     private var live: Category {
         vm.categories.first { $0.id == category.id } ?? category
@@ -23,8 +25,12 @@ struct CategoryDetailSheet: View {
                     VStack(spacing: 16) {
                         categoryHeader
                         budgetCard
-                        if let insight = vm.insight(for: live) {
-                            insightBanner(insight)
+                        if subManager.isProUser {
+                            if let insight = vm.insight(for: live) {
+                                insightBanner(insight)
+                            }
+                        } else {
+                            lockedInsightBanner
                         }
                         transactionsSection
                     }
@@ -53,6 +59,9 @@ struct CategoryDetailSheet: View {
         .presentationBackground(VeloceTheme.bg)
         .sheet(item: $editingExpense) { exp in
             EditExpenseSheet(expense: exp).environmentObject(vm)
+        }
+        .sheet(isPresented: $showPaywall) {
+            PaywallView().environmentObject(subManager)
         }
     }
 
@@ -197,6 +206,40 @@ struct CategoryDetailSheet: View {
             RoundedRectangle(cornerRadius: 14, style: .continuous)
                 .strokeBorder(color.opacity(0.2), lineWidth: 1)
         )
+    }
+
+    // MARK: - Locked Insight (non-pro)
+
+    private var lockedInsightBanner: some View {
+        Button(action: { showPaywall = true }) {
+            HStack(spacing: 12) {
+                Image(systemName: "lock.fill")
+                    .font(.system(size: 15))
+                    .foregroundStyle(VeloceTheme.accent)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("AI Insight available")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(VeloceTheme.textPrimary)
+                    Text("Upgrade to Pro to unlock")
+                        .font(.system(size: 12))
+                        .foregroundStyle(VeloceTheme.textSecondary)
+                }
+                Spacer()
+                Text("Unlock")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 5)
+                    .background(VeloceTheme.accent, in: Capsule())
+            }
+            .padding(14)
+            .background(VeloceTheme.accentBg, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .strokeBorder(VeloceTheme.accent.opacity(0.2), lineWidth: 1)
+            )
+        }
+        .buttonStyle(.plain)
     }
 
     // MARK: - Transactions

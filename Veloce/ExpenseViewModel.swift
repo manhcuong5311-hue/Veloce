@@ -27,10 +27,12 @@ final class ExpenseViewModel: ObservableObject {
 
     // MARK: Computed (cached via lazy pattern in body)
 
+    var visibleCategories: [Category] { categories.filter { !$0.isHidden } }
+
     var totalBudget: Double   { categories.reduce(0) { $0 + $1.budget } }
     var totalSpent:  Double   { categories.reduce(0) { $0 + $1.spent  } }
     var overallRatio: Double  { totalBudget > 0 ? min(totalSpent / totalBudget, 1) : 0 }
-    var maxCategorySpent: Double { categories.map(\.spent).max() ?? 1 }
+    var maxCategorySpent: Double { visibleCategories.map(\.spent).max() ?? 1 }
 
     /// Pre-sorted expenses (descending date) — used as source for grouping
     var sortedExpenses: [Expense] {
@@ -138,6 +140,21 @@ final class ExpenseViewModel: ObservableObject {
         guard let i = categories.firstIndex(where: { $0.id == categoryId }) else { return }
         withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
             categories[i].budget = newBudget
+        }
+    }
+
+    func deleteExpenses(_ items: [Expense]) {
+        for exp in items { deleteExpense(exp) }
+    }
+
+    func toggleCategoryVisibility(id: UUID) {
+        guard let i = categories.firstIndex(where: { $0.id == id }) else { return }
+        withAnimation(.spring(response: 0.3)) { categories[i].isHidden.toggle() }
+    }
+
+    func reorderCategories(from source: IndexSet, to destination: Int) {
+        withAnimation(.spring(response: 0.3)) {
+            categories.move(fromOffsets: source, toOffset: destination)
         }
     }
 

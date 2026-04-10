@@ -21,9 +21,9 @@ struct CategoryColumnView: View, Equatable {
     }
 
     // Layout constants
-    private let colWidth:    CGFloat = 58
-    private let maxBarH:     CGFloat = 150
-    private let trackRadius: CGFloat = 12
+    private let colWidth:    CGFloat = 62
+    private let maxBarH:     CGFloat = 200
+    private let trackRadius: CGFloat = 14
 
     private var barHeight: CGFloat {
         let h = CGFloat(barRatio) * maxBarH
@@ -79,7 +79,7 @@ struct CategoryColumnView: View, Equatable {
                     )
                     .overlay(alignment: .top) {
                         // Icon cap — only render when bar is tall enough
-                        if barHeight >= 38 {
+                        if barHeight >= 44 {
                             Image(systemName: category.icon)
                                 .font(.system(size: 13, weight: .medium))
                                 .foregroundStyle(.white.opacity(0.9))
