@@ -62,10 +62,12 @@ struct Expense: Identifiable, Codable, Equatable {
 
 // MARK: - AI Types
 
-struct ParsedExpense {
+struct ParsedExpense: Identifiable {
+    let id = UUID()
     var title: String
     var amount: Double
-    var categoryName: String
+    /// nil = no keyword matched — caller should ask user to pick a group
+    var categoryName: String?
     var date: Date
 }
 

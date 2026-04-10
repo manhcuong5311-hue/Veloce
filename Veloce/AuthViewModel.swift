@@ -69,14 +69,37 @@ final class AuthViewModel: ObservableObject {
         }
     }
 
-    // MARK: - Google Sign-In (stub)
-    // To enable Google Sign-In:
-    // 1. Add package: https://github.com/google/GoogleSignIn-iOS
-    // 2. Add REVERSED_CLIENT_ID from GoogleService-Info.plist as a URL scheme in Info.plist
-    // 3. Replace this stub with the GIDSignIn implementation
+    // MARK: - Google Sign-In (Firebase OAuthProvider — no extra SDK required)
+    // Requires: Google enabled in Firebase console + REVERSED_CLIENT_ID URL scheme in Info.plist
 
-    func signInWithGoogle() {
-        errorMessage = "Google Sign-In coming soon. Use Apple or Email for now."
+    func signInWithGoogle() async {
+        isLoading = true
+        errorMessage = nil
+        let provider = OAuthProvider(providerID: "google.com")
+        provider.scopes = ["profile", "email"]
+        do {
+            let credential: AuthCredential = try await withCheckedThrowingContinuation { continuation in
+                provider.getCredentialWith(nil) { credential, error in
+                    if let error {
+                        continuation.resume(throwing: error)
+                    } else if let credential {
+                        continuation.resume(returning: credential)
+                    } else {
+                        continuation.resume(throwing: NSError(
+                            domain: "VeloceAuth", code: -1,
+                            userInfo: [NSLocalizedDescriptionKey: "No credential returned from Google."]))
+                    }
+                }
+            }
+            await performSignIn(credential)
+        } catch let nsErr as NSError where
+            nsErr.code == AuthErrorCode.webContextCancelled.rawValue ||
+            nsErr.code == AuthErrorCode.webContextAlreadyPresented.rawValue {
+            // User cancelled — silent
+        } catch {
+            errorMessage = friendlyError(error)
+        }
+        isLoading = false
     }
 
     // MARK: - Email / Password

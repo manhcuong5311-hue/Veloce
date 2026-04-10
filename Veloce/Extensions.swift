@@ -1,5 +1,101 @@
 import SwiftUI
 
+// MARK: - Currency
+
+enum AppCurrency: String, CaseIterable, Identifiable {
+    case vnd = "VND"
+    case usd = "USD"
+    case eur = "EUR"
+    case jpy = "JPY"
+    case gbp = "GBP"
+    case krw = "KRW"
+    case sgd = "SGD"
+    case thb = "THB"
+
+    var id: String { rawValue }
+
+    var symbol: String {
+        switch self {
+        case .vnd: return "đ"
+        case .usd: return "$"
+        case .eur: return "€"
+        case .jpy: return "¥"
+        case .gbp: return "£"
+        case .krw: return "₩"
+        case .sgd: return "S$"
+        case .thb: return "฿"
+        }
+    }
+
+    var displayName: String {
+        switch self {
+        case .vnd: return "VNĐ  đ"
+        case .usd: return "USD  $"
+        case .eur: return "EUR  €"
+        case .jpy: return "JPY  ¥"
+        case .gbp: return "GBP  £"
+        case .krw: return "KRW  ₩"
+        case .sgd: return "SGD  S$"
+        case .thb: return "THB  ฿"
+        }
+    }
+
+    /// Thousands separator: VND / KRW use "." (100.000), others use "," (100,000)
+    var thousandsSep: String {
+        switch self {
+        case .vnd, .krw: return "."
+        default:         return ","
+        }
+    }
+
+    /// Whether the symbol goes before the number
+    var symbolLeading: Bool {
+        switch self {
+        case .vnd: return false   // 100.000đ
+        default:   return true    // $1,000
+        }
+    }
+
+    /// VND / JPY / KRW display as whole numbers only
+    var showsDecimals: Bool {
+        switch self {
+        case .vnd, .jpy, .krw: return false
+        default:                return true
+        }
+    }
+
+    static var current: AppCurrency {
+        AppCurrency(rawValue: UserDefaults.standard.string(forKey: "veloce_currency") ?? "VND") ?? .vnd
+    }
+}
+
+// MARK: - Speech Language
+
+struct SpeechLanguage: Identifiable, Hashable {
+    let code: String   // BCP-47 locale identifier
+    let flag: String
+    let name: String
+    var id: String { code }
+
+    static let all: [SpeechLanguage] = [
+        .init(code: "vi-VN", flag: "🇻🇳", name: "Tiếng Việt"),
+        .init(code: "en-US", flag: "🇺🇸", name: "English (US)"),
+        .init(code: "en-GB", flag: "🇬🇧", name: "English (UK)"),
+        .init(code: "zh-CN", flag: "🇨🇳", name: "中文 (简体)"),
+        .init(code: "ja-JP", flag: "🇯🇵", name: "日本語"),
+        .init(code: "ko-KR", flag: "🇰🇷", name: "한국어"),
+        .init(code: "fr-FR", flag: "🇫🇷", name: "Français"),
+        .init(code: "es-ES", flag: "🇪🇸", name: "Español"),
+        .init(code: "th-TH", flag: "🇹🇭", name: "ภาษาไทย"),
+        .init(code: "de-DE", flag: "🇩🇪", name: "Deutsch"),
+    ]
+
+    static var current: SpeechLanguage {
+        let code = UserDefaults.standard.string(forKey: "veloce_speech_language") ?? "vi-VN"
+        return all.first { $0.code == code } ?? all[0]
+    }
+}
+
 // MARK: - Design Tokens
 
 enum VeloceTheme {
@@ -73,30 +169,54 @@ extension View {
 // MARK: - Number formatting
 
 extension Double {
+
     func toCompactCurrency() -> String {
+        let c = AppCurrency.current
+        func place(_ s: String) -> String {
+            c.symbolLeading ? "\(c.symbol)\(s)" : "\(s)\(c.symbol)"
+        }
         if self >= 1_000_000 {
             let m = self / 1_000_000
             let s = m.truncatingRemainder(dividingBy: 1) == 0
                 ? String(format: "%.0fM", m)
                 : String(format: "%.1fM", m)
-            return s + "đ"
+            return place(s)
         }
         if self >= 1_000 {
             let k = self / 1_000
             let s = k.truncatingRemainder(dividingBy: 1) == 0
                 ? String(format: "%.0fk", k)
                 : String(format: "%.1fk", k)
-            return s + "đ"
+            return place(s)
         }
-        return "\(Int(self))đ"
+        let s = c.showsDecimals
+            ? String(format: "%.2f", self)
+            : "\(Int(self))"
+        return place(s)
     }
 
     func toCurrencyString() -> String {
+        let c = AppCurrency.current
         let f = NumberFormatter()
         f.numberStyle = .decimal
-        f.groupingSeparator = "."
+        f.groupingSeparator    = c.thousandsSep
+        f.usesGroupingSeparator = true
+        f.maximumFractionDigits = c.showsDecimals ? 2 : 0
+        f.minimumFractionDigits = 0
+        let s = f.string(from: NSNumber(value: self)) ?? "\(Int(self))"
+        return c.symbolLeading ? "\(c.symbol)\(s)" : "\(s)\(c.symbol)"
+    }
+
+    /// Formats a raw digit string with the correct thousands separator while typing.
+    static func formatAmountInput(_ digits: String) -> String {
+        guard !digits.isEmpty, let val = Double(digits) else { return digits }
+        let c = AppCurrency.current
+        let f = NumberFormatter()
+        f.numberStyle = .decimal
+        f.groupingSeparator    = c.thousandsSep
+        f.usesGroupingSeparator = true
         f.maximumFractionDigits = 0
-        return (f.string(from: NSNumber(value: self)) ?? "\(Int(self))") + "đ"
+        return f.string(from: NSNumber(value: val)) ?? digits
     }
 }
 

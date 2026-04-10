@@ -9,9 +9,25 @@ struct SettingsView: View {
     @EnvironmentObject private var vm:         ExpenseViewModel
     @Environment(\.dismiss) private var dismiss
 
-    @AppStorage("veloce_ai_suggestions") private var aiSuggestionsEnabled = true
-    @State private var showPaywall         = false
-    @State private var showSignOutConfirm  = false
+    @AppStorage("veloce_ai_suggestions")   private var aiSuggestionsEnabled = true
+    @AppStorage("veloce_currency")         private var currencyCode         = "VND"
+    @AppStorage("veloce_speech_language")  private var speechLangCode       = "vi-VN"
+    @State private var showPaywall        = false
+    @State private var showSignOutConfirm = false
+
+    private var selectedCurrency: Binding<AppCurrency> {
+        Binding(
+            get: { AppCurrency(rawValue: currencyCode) ?? .vnd },
+            set: { currencyCode = $0.rawValue }
+        )
+    }
+
+    private var selectedSpeechLang: Binding<SpeechLanguage> {
+        Binding(
+            get: { SpeechLanguage.all.first { $0.code == speechLangCode } ?? SpeechLanguage.all[0] },
+            set: { speechLangCode = $0.code }
+        )
+    }
 
     var body: some View {
         NavigationStack {
@@ -153,14 +169,25 @@ struct SettingsView: View {
             }
             .tint(VeloceTheme.accent)
 
-            HStack {
+            Picker(selection: selectedCurrency) {
+                ForEach(AppCurrency.allCases) { currency in
+                    Text(currency.displayName).tag(currency)
+                }
+            } label: {
                 Label("Currency", systemImage: "dollarsign.circle")
                     .foregroundStyle(VeloceTheme.textPrimary)
-                Spacer()
-                Text("VND đ")
-                    .font(.system(size: 14))
-                    .foregroundStyle(VeloceTheme.textSecondary)
             }
+            .tint(VeloceTheme.accent)
+
+            Picker(selection: selectedSpeechLang) {
+                ForEach(SpeechLanguage.all) { lang in
+                    Text("\(lang.flag)  \(lang.name)").tag(lang)
+                }
+            } label: {
+                Label("Voice Language", systemImage: "mic.circle")
+                    .foregroundStyle(VeloceTheme.textPrimary)
+            }
+            .tint(VeloceTheme.accent)
         } header: {
             Text("Preferences")
         }

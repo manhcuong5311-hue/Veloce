@@ -24,7 +24,7 @@ struct ContentView: View {
                 ScrollView(showsIndicators: false) {
                     LazyVStack(spacing: 0, pinnedViews: []) {
                         // ── Summary header ───────────────────────────────────
-                        SummaryHeaderView(onAITap: handleAITap)
+                        SummaryHeaderView()
                             .environmentObject(vm)
                             .padding(.horizontal, 20)
                             .padding(.top, 8)
@@ -57,15 +57,17 @@ struct ContentView: View {
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button(action: { showSettings = true }) {
-                        Image(systemName: "gearshape")
-                            .font(.system(size: 16, weight: .medium))
+                        Image(systemName: "gearshape.fill")
+                            .font(.system(size: 15, weight: .medium))
                             .foregroundStyle(VeloceTheme.textSecondary)
+                            .frame(width: 34, height: 34)
+                            .background(VeloceTheme.surfaceRaised, in: Circle())
                     }
                 }
             }
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
-            InputBarView(onManualAdd: { showAddExpense = true })
+            InputBarView(onAITap: handleAITap, onManualAdd: { showAddExpense = true })
                 .environmentObject(vm)
         }
         .sheet(item: $selectedCategory) { cat in
@@ -113,7 +115,6 @@ struct ContentView: View {
 
 private struct SummaryHeaderView: View {
     @EnvironmentObject var vm: ExpenseViewModel
-    var onAITap: () -> Void = {}
 
     private var monthYear: String {
         let f = DateFormatter()
@@ -124,26 +125,11 @@ private struct SummaryHeaderView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
-            // Month label + AI button
-            HStack {
-                Text(monthYear)
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundStyle(VeloceTheme.textSecondary)
-                    .tracking(0.3)
-                Spacer()
-                Button(action: onAITap) {
-                    HStack(spacing: 5) {
-                        Image(systemName: "sparkles")
-                            .font(.system(size: 12, weight: .semibold))
-                        Text("AI")
-                            .font(.system(size: 12, weight: .semibold))
-                    }
-                    .foregroundStyle(VeloceTheme.accent)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 6)
-                    .background(VeloceTheme.accentBg, in: Capsule())
-                }
-            }
+            // Month label
+            Text(monthYear)
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(VeloceTheme.textSecondary)
+                .tracking(0.3)
 
             // Total spent hero
             HStack(alignment: .lastTextBaseline, spacing: 6) {
@@ -319,8 +305,6 @@ private struct DaySection: View {
     let group:  ExpenseGroup
     let onEdit: (Expense) -> Void
 
-    @State private var confirmDelete = false
-
     private var dayTotal: Double { group.items.reduce(0) { $0 + $1.amount } }
 
     var body: some View {
@@ -334,25 +318,6 @@ private struct DaySection: View {
                 Text(dayTotal.toCompactCurrency())
                     .font(.system(size: 13, weight: .medium, design: .rounded))
                     .foregroundStyle(VeloceTheme.textTertiary)
-                Button { confirmDelete = true } label: {
-                    Image(systemName: "trash")
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(VeloceTheme.textTertiary)
-                        .frame(width: 26, height: 26)
-                        .background(
-                            VeloceTheme.surfaceRaised,
-                            in: RoundedRectangle(cornerRadius: 7, style: .continuous)
-                        )
-                }
-                .confirmationDialog(
-                    "Delete all \(group.items.count) expense\(group.items.count == 1 ? "" : "s") from \(group.title)?",
-                    isPresented: $confirmDelete,
-                    titleVisibility: .visible
-                ) {
-                    Button("Delete All", role: .destructive) {
-                        withAnimation { vm.deleteExpenses(group.items) }
-                    }
-                }
             }
 
             VStack(spacing: 8) {

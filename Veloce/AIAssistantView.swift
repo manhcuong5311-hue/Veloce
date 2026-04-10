@@ -8,7 +8,7 @@ struct ChatMessage: Identifiable, Equatable {
     let content:   String
     let timestamp: Date = Date()
 
-    enum Role { case user, assistant, error }
+    enum Role { case user, assistant, error, debug }
 }
 
 // MARK: - AI Assistant Chat View
@@ -188,7 +188,12 @@ struct AIAssistantView: View {
                 )
                 messages.append(ChatMessage(role: .assistant, content: response))
             } catch {
-                messages.append(ChatMessage(role: .error, content: error.localizedDescription))
+                // Show what went wrong so the user/developer can diagnose it,
+                // then fall back to a rule-based local answer.
+                let debugLine = cloudErrorNote(error)
+                let local     = localResponse(for: text)
+                messages.append(ChatMessage(role: .debug,     content: debugLine))
+                messages.append(ChatMessage(role: .assistant, content: local))
             }
             isThinking = false
         }
@@ -232,12 +237,106 @@ struct AIAssistantView: View {
     }
 
     private func buildAPIMessages(userText: String) -> [OpenAIMessage] {
+        // Only send user/assistant turns — exclude error and debug notes
         let conversationMessages = messages.filter { $0.role == .user || $0.role == .assistant }
         var apiMessages: [OpenAIMessage] = conversationMessages.suffix(10).map {
             OpenAIMessage(role: $0.role == .user ? "user" : "assistant", content: $0.content)
         }
         apiMessages.append(OpenAIMessage(role: "user", content: userText))
         return apiMessages
+    }
+
+    // MARK: - Cloud error diagnostics
+
+    /// Converts a Firebase Functions / network error into a human-readable debug note.
+    private func cloudErrorNote(_ error: Error) -> String {
+        let ns  = error as NSError
+        let raw = error.localizedDescription
+
+        // Firebase Functions errors carry a numeric code in the NSError.
+        // Domain: com.firebase.functions  (FIRFunctionsErrorDomain)
+        // Codes mirror gRPC status codes:
+        //   1  = CANCELLED        7  = PERMISSION_DENIED   13 = INTERNAL
+        //   2  = UNKNOWN          8  = RESOURCE_EXHAUSTED  14 = UNAVAILABLE
+        //   3  = INVALID_ARGUMENT 9  = FAILED_PRECONDITION 16 = UNAUTHENTICATED
+        //   5  = NOT_FOUND        11 = OUT_OF_RANGE
+        let label: String
+        if ns.domain == "com.firebase.functions" {
+            switch ns.code {
+            case 16: label = "UNAUTHENTICATED — Firebase token invalid or expired. Try signing out and back in."
+            case 7:  label = "PERMISSION_DENIED — your account doesn't have access to this function."
+            case 5:  label = "NOT_FOUND — the Cloud Function isn't deployed yet. Run: firebase deploy --only functions"
+            case 14: label = "UNAVAILABLE — network error or function crashed. Check Firebase logs."
+            case 13: label = "INTERNAL — OpenAI returned an error. Check your API key in Secret Manager."
+            case 8:  label = "RESOURCE_EXHAUSTED — OpenAI rate limit hit. Try again in a moment."
+            default: label = "Firebase error \(ns.code): \(raw)"
+            }
+        } else if raw.lowercased().contains("network") || raw.lowercased().contains("internet") {
+            label = "No internet connection — answered locally."
+        } else {
+            label = "\(ns.domain) \(ns.code): \(raw)"
+        }
+
+        return "☁️ Cloud AI offline · \(label)"
+    }
+
+    // MARK: - Local fallback (used when Cloud Function is unavailable)
+
+    private func localResponse(for text: String) -> String {
+        let t       = text.lowercased()
+        let spent   = vm.totalSpent
+        let budget  = vm.totalBudget
+        let remain  = budget - spent
+        let cats    = vm.categories.filter { $0.spent > 0 }.sorted { $0.spent > $1.spent }
+
+        // Over-budget question
+        if t.contains("over") || t.contains("exceed") || t.contains("vượt") {
+            let overCats = vm.categories.filter { $0.isOverBudget }
+            if overCats.isEmpty {
+                return "You're within budget on every category. Keep it up!"
+            }
+            let list = overCats.map { "**\($0.name)** (over by \(($0.spent - $0.budget).toCompactCurrency()))" }.joined(separator: ", ")
+            return "You're over budget on: \(list)."
+        }
+
+        // Top spending / most expensive
+        if t.contains("top") || t.contains("most") || t.contains("highest") || t.contains("biggest") {
+            if let top = cats.first {
+                return "Your highest spend this month is **\(top.name)** at **\(top.spent.toCompactCurrency())** (budget: \(top.budget.toCompactCurrency()))."
+            }
+        }
+
+        // Savings question
+        if t.contains("save") || t.contains("saving") || t.contains("tiết kiệm") {
+            let goal = vm.savingGoal
+            let income = vm.monthlyIncome
+            let projected = income - spent
+            if projected >= goal {
+                return "You're on track to save **\(projected.toCompactCurrency())** this month — your goal is \(goal.toCompactCurrency()). Great!"
+            } else {
+                return "At current spending you'd save **\(max(0, projected).toCompactCurrency())**. To hit your goal of \(goal.toCompactCurrency()) you'd need to cut **\((goal - projected).toCompactCurrency())** more."
+            }
+        }
+
+        // Category breakdown
+        if t.contains("categor") || t.contains("breakdown") || t.contains("detail") {
+            guard !cats.isEmpty else { return "No spending recorded yet. Add your first expense!" }
+            let lines = cats.prefix(5).map { "• **\($0.name)**: \($0.spent.toCompactCurrency()) / \($0.budget.toCompactCurrency())" }
+            return "Here's your spending breakdown:\n" + lines.joined(separator: "\n")
+        }
+
+        // General budget status
+        if t.contains("budget") || t.contains("spend") || t.contains("how much") || t.contains("bao nhiêu") {
+            let pct = budget > 0 ? Int((spent / budget) * 100) : 0
+            if remain < 0 {
+                return "You're **\((-remain).toCompactCurrency()) over budget** this month (\(pct)% used)."
+            }
+            return "You've spent **\(spent.toCompactCurrency())** of your **\(budget.toCompactCurrency())** budget — \(pct)% used, **\(remain.toCompactCurrency())** remaining."
+        }
+
+        // Default helpful response
+        let pct = budget > 0 ? Int((spent / budget) * 100) : 0
+        return "You've spent **\(spent.toCompactCurrency())** this month (\(pct)% of budget). Ask me about your categories, savings, or budget tips!"
     }
 }
 
@@ -247,30 +346,48 @@ private struct MessageBubble: View {
     let message: ChatMessage
 
     var body: some View {
-        HStack(alignment: .bottom, spacing: 8) {
-            if message.role == .user { Spacer(minLength: 48) }
-
-            if message.role != .user {
-                ZStack {
-                    Circle()
-                        .fill(VeloceTheme.accentBg)
-                        .frame(width: 30, height: 30)
-                    Image(systemName: message.role == .error ? "exclamationmark.triangle.fill" : "sparkles")
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(message.role == .error ? VeloceTheme.over : VeloceTheme.accent)
-                }
-                .alignmentGuide(.bottom) { d in d[.bottom] }
+        // Debug notes render as a slim inline banner (not a full bubble)
+        if message.role == .debug {
+            HStack(spacing: 6) {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(VeloceTheme.caution)
+                Text(message.content)
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(VeloceTheme.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 7)
+            .background(VeloceTheme.caution.opacity(0.10),
+                        in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .frame(maxWidth: .infinity, alignment: .leading)
+        } else {
+            HStack(alignment: .bottom, spacing: 8) {
+                if message.role == .user { Spacer(minLength: 48) }
 
-            Text(LocalizedStringKey(message.content))
-                .font(.system(size: 14))
-                .foregroundStyle(bubbleForeground)
-                .padding(.horizontal, 14)
-                .padding(.vertical, 10)
-                .background(bubbleBackground, in: bubbleShape)
-                .fixedSize(horizontal: false, vertical: true)
+                if message.role != .user {
+                    ZStack {
+                        Circle()
+                            .fill(VeloceTheme.accentBg)
+                            .frame(width: 30, height: 30)
+                        Image(systemName: message.role == .error ? "exclamationmark.triangle.fill" : "sparkles")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(message.role == .error ? VeloceTheme.over : VeloceTheme.accent)
+                    }
+                    .alignmentGuide(.bottom) { d in d[.bottom] }
+                }
 
-            if message.role != .user { Spacer(minLength: 48) }
+                Text(LocalizedStringKey(message.content))
+                    .font(.system(size: 14))
+                    .foregroundStyle(bubbleForeground)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 10)
+                    .background(bubbleBackground, in: bubbleShape)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                if message.role != .user { Spacer(minLength: 48) }
+            }
         }
     }
 
@@ -279,6 +396,7 @@ private struct MessageBubble: View {
         case .user:      return .white
         case .assistant: return VeloceTheme.textPrimary
         case .error:     return VeloceTheme.over
+        default:         return VeloceTheme.textPrimary
         }
     }
 
@@ -287,6 +405,7 @@ private struct MessageBubble: View {
         case .user:      return VeloceTheme.accent
         case .assistant: return VeloceTheme.surface
         case .error:     return VeloceTheme.over.opacity(0.08)
+        default:         return VeloceTheme.surface
         }
     }
 

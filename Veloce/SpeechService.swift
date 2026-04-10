@@ -12,7 +12,12 @@ final class SpeechService: ObservableObject {
     @Published var isListening = false
     @Published var authStatus: SFSpeechRecognizerAuthorizationStatus = .notDetermined
 
-    private let recognizer = SFSpeechRecognizer(locale: Locale(identifier: "vi-VN"))
+    /// Computed so it always picks up the latest language setting without restarting the service.
+    private var recognizer: SFSpeechRecognizer? {
+        SFSpeechRecognizer(locale: Locale(identifier:
+            UserDefaults.standard.string(forKey: "veloce_speech_language") ?? "vi-VN"))
+    }
+
     private var request: SFSpeechAudioBufferRecognitionRequest?
     private var task: SFSpeechRecognitionTask?
     private let engine = AVAudioEngine()

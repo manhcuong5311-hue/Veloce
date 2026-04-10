@@ -1,6 +1,14 @@
 import SwiftUI
 import Combine
 
+// MARK: - Parse result
+
+enum ParseResult {
+    case added                         // parsed + category found → expense added automatically
+    case needsCategory(ParsedExpense)  // parsed OK but category unknown → show picker
+    case failed                        // couldn't extract an amount
+}
+
 // MARK: - Expense Group (for timeline display)
 
 struct ExpenseGroup: Identifiable {
@@ -21,11 +29,18 @@ final class ExpenseViewModel: ObservableObject {
     @Published var highlightedCategoryId: UUID? = nil
     @Published var isHeightRelative = false
 
-    // Settings
-    var monthlyIncome: Double = 15_000_000
-    var savingGoal:    Double = 3_000_000
+    // Settings — backed by PersistenceStore
+    var monthlyIncome: Double {
+        didSet { PersistenceStore.shared.saveMonthlyIncome(monthlyIncome) }
+    }
+    var savingGoal: Double {
+        didSet { PersistenceStore.shared.saveSavingGoal(savingGoal) }
+    }
 
-    // MARK: Computed (cached via lazy pattern in body)
+    // Combine auto-save
+    private var cancellables = Set<AnyCancellable>()
+
+    // MARK: Computed
 
     var visibleCategories: [Category] { categories.filter { !$0.isHidden } }
 
@@ -43,7 +58,6 @@ final class ExpenseViewModel: ObservableObject {
     var expenseGroups: [ExpenseGroup] {
         let cal = Calendar.current
         let sorted = sortedExpenses
-        // Group by start-of-day
         var buckets: [(Date, [Expense])] = []
         var currentDay: Date?
         var currentItems: [Expense] = []
@@ -118,20 +132,38 @@ final class ExpenseViewModel: ObservableObject {
 
     // MARK: AI input
 
+    /// Full pipeline: parse text → match category → add or return `.needsCategory`.
+    func parseExpenseResult(from text: String) -> ParseResult {
+        guard let parsed = AIService.parseExpense(text) else { return .failed }
+
+        let matched = resolveCategory(parsed.categoryName)
+
+        if let cat = matched {
+            addExpense(Expense(title: parsed.title, amount: parsed.amount,
+                               categoryId: cat.id, date: parsed.date))
+            return .added
+        }
+
+        return .needsCategory(parsed)
+    }
+
+    /// Resolves a detected category name to one of the user's actual categories.
+    func resolveCategory(_ detectedName: String?) -> Category? {
+        guard let name = detectedName else { return nil }
+        let lower = name.lowercased()
+        if let c = categories.first(where: { $0.name.lowercased() == lower }) { return c }
+        if let c = categories.first(where: {
+            lower.contains($0.name.lowercased()) || $0.name.lowercased().contains(lower)
+        }) { return c }
+        return nil
+    }
+
     @discardableResult
     func parseAndAddExpense(from text: String) -> Bool {
-        guard let parsed = AIService.parseExpense(text) else { return false }
-        let cat = categories.first { $0.name == parsed.categoryName }
-            ?? categories.first { $0.name == "Other" }
-            ?? categories.first
-        guard let cat else { return false }
-        addExpense(Expense(
-            title:      parsed.title,
-            amount:     parsed.amount,
-            categoryId: cat.id,
-            date:       parsed.date
-        ))
-        return true
+        switch parseExpenseResult(from: text) {
+        case .added: return true
+        default:     return false
+        }
     }
 
     // MARK: Budget
@@ -140,6 +172,13 @@ final class ExpenseViewModel: ObservableObject {
         guard let i = categories.firstIndex(where: { $0.id == categoryId }) else { return }
         withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
             categories[i].budget = newBudget
+        }
+    }
+
+    func updateCategory(_ updated: Category) {
+        guard let i = categories.firstIndex(where: { $0.id == updated.id }) else { return }
+        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+            categories[i] = updated
         }
     }
 
@@ -185,7 +224,7 @@ final class ExpenseViewModel: ObservableObject {
         categories.first { $0.id == id }
     }
 
-    // MARK: Private
+    // MARK: Private helpers
 
     private func adjustSpent(categoryId: UUID, delta: Double) {
         guard let i = categories.firstIndex(where: { $0.id == categoryId }) else { return }
@@ -202,64 +241,42 @@ final class ExpenseViewModel: ObservableObject {
         }
     }
 
-    // MARK: Mock data
+    // MARK: Default data
 
-    init() { loadMockData() }
-
-    private func loadMockData() {
-        // Pastel colors calibrated for light backgrounds
-        categories = [
-            Category(name: "Food",          icon: "fork.knife",           budget: 3_000_000, spent: 2_100_000, colorHex: "E07A5F"),
-            Category(name: "Transport",     icon: "car.fill",             budget: 1_500_000, spent: 890_000,   colorHex: "5B8DB8"),
-            Category(name: "Shopping",      icon: "bag.fill",             budget: 2_000_000, spent: 2_350_000, colorHex: "9B84D0"),
-            Category(name: "Bills",         icon: "bolt.fill",            budget: 2_500_000, spent: 1_200_000, colorHex: "D4A853"),
-            Category(name: "Health",        icon: "heart.fill",           budget: 1_000_000, spent: 450_000,   colorHex: "5BA88C"),
-            Category(name: "Entertainment", icon: "popcorn.fill",         budget: 1_000_000, spent: 800_000,   colorHex: "C97BA8"),
-            Category(name: "Other",         icon: "ellipsis.circle.fill", budget: 500_000,   spent: 120_000,   colorHex: "8A95A8"),
+    private static func defaultCategories() -> [Category] {
+        [
+            Category(name: "Food",          icon: "fork.knife",           budget: 3_000_000, spent: 0, colorHex: "E07A5F"),
+            Category(name: "Transport",     icon: "car.fill",             budget: 1_500_000, spent: 0, colorHex: "5B8DB8"),
+            Category(name: "Shopping",      icon: "bag.fill",             budget: 2_000_000, spent: 0, colorHex: "9B84D0"),
+            Category(name: "Bills",         icon: "bolt.fill",            budget: 2_500_000, spent: 0, colorHex: "D4A853"),
+            Category(name: "Health",        icon: "heart.fill",           budget: 1_000_000, spent: 0, colorHex: "5BA88C"),
+            Category(name: "Entertainment", icon: "popcorn.fill",         budget: 1_000_000, spent: 0, colorHex: "C97BA8"),
+            Category(name: "Other",         icon: "ellipsis.circle.fill", budget: 500_000,   spent: 0, colorHex: "8A95A8"),
         ]
+    }
 
-        let now = Date()
-        let cal = Calendar.current
-        func ago(_ days: Int, hour: Int = 12) -> Date {
-            var comps = cal.dateComponents([.year, .month, .day], from: now)
-            comps.hour = hour; comps.minute = Int.random(in: 0...59)
-            if let base = cal.date(from: comps) {
-                return cal.date(byAdding: .day, value: -days, to: base) ?? now
-            }
-            return now
-        }
+    // MARK: Init — loads persisted data, then wires Combine auto-save
 
-        let items: [(String, Double, String, Int, Int)] = [
-            ("Phở bò Quỳnh Anh",    55_000,  "Food",          0,  7),
-            ("Grab Bike đi làm",     38_000,  "Transport",     0,  8),
-            ("Cà phê sữa đá",        35_000,  "Food",          0,  8),
-            ("Cơm trưa văn phòng",   55_000,  "Food",          0, 12),
-            ("Grab về nhà",          42_000,  "Transport",     0, 18),
-            ("Trà sữa Gong Cha",     65_000,  "Food",          0, 15),
-            ("Dinner gia đình",     350_000,  "Food",          0, 19),
-            ("Cà phê sáng",          40_000,  "Food",          1,  8),
-            ("Xe bus",               10_000,  "Transport",     1,  7),
-            ("Bún chả trưa",         60_000,  "Food",          1, 12),
-            ("Áo thun Uniqlo",      350_000,  "Shopping",      2, 14),
-            ("Grab chiều",           45_000,  "Transport",     2, 17),
-            ("Điện tháng 4",        450_000,  "Bills",         3, 10),
-            ("Wifi VNPT",           200_000,  "Bills",         3, 10),
-            ("Bánh mì sáng",         25_000,  "Food",          3,  7),
-            ("Gym tháng",           300_000,  "Health",        5, 18),
-            ("Netflix Premium",     180_000,  "Entertainment", 5, 20),
-            ("Vitamin C Kirkland",  150_000,  "Health",        7, 20),
-            ("Giày Nike Air Max",   800_000,  "Shopping",      4, 15),
-            ("Nước uống",            15_000,  "Food",          5, 14),
-            ("Vé CGV Avengers",     120_000,  "Entertainment", 6, 19),
-            ("Shopee order",      1_200_000,  "Shopping",      6, 11),
-            ("Xăng xe máy",         200_000,  "Transport",     7,  8),
-            ("Bún bò Huế",           60_000,  "Food",          8,  7),
-            ("Khám sức khoẻ",       250_000,  "Health",        9, 10),
-        ]
+    init() {
+        let store = PersistenceStore.shared
 
-        expenses = items.compactMap { title, amount, catName, days, hour in
-            guard let cat = categories.first(where: { $0.name == catName }) else { return nil }
-            return Expense(title: title, amount: amount, categoryId: cat.id, date: ago(days, hour: hour))
-        }
+        // Load persisted state (or fall back to defaults)
+        self.categories    = store.loadCategories() ?? Self.defaultCategories()
+        self.expenses      = store.loadExpenses()   ?? []
+        self.monthlyIncome = store.loadMonthlyIncome()
+        self.savingGoal    = store.loadSavingGoal()
+
+        // Auto-save whenever published collections change (debounced 400 ms)
+        $categories
+            .dropFirst()                         // skip the initial assignment
+            .debounce(for: .milliseconds(400), scheduler: RunLoop.main)
+            .sink { store.saveCategories($0) }
+            .store(in: &cancellables)
+
+        $expenses
+            .dropFirst()
+            .debounce(for: .milliseconds(400), scheduler: RunLoop.main)
+            .sink { store.saveExpenses($0) }
+            .store(in: &cancellables)
     }
 }

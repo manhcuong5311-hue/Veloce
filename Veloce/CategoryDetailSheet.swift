@@ -12,6 +12,16 @@ struct CategoryDetailSheet: View {
     @State private var editingExpense: Expense? = nil
     @State private var showPaywall    = false
 
+    private let budgetPresets: [(label: String, value: Double)] = [
+        ("500K",   500_000),
+        ("1 tr",   1_000_000),
+        ("1.5 tr", 1_500_000),
+        ("2 tr",   2_000_000),
+        ("3 tr",   3_000_000),
+        ("5 tr",   5_000_000),
+        ("10 tr",  10_000_000),
+    ]
+
     private var live: Category {
         vm.categories.first { $0.id == category.id } ?? category
     }
@@ -138,6 +148,41 @@ struct CategoryDetailSheet: View {
                             .foregroundStyle(VeloceTheme.textPrimary)
                     }
                 }
+            }
+
+            // Budget preset chips (shown while editing)
+            if editingBudget {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        ForEach(budgetPresets, id: \.label) { preset in
+                            let isSel = budgetInput == "\(Int(preset.value))"
+                            Button {
+                                budgetInput = "\(Int(preset.value))"
+                            } label: {
+                                Text(preset.label)
+                                    .font(.system(size: 12, weight: .semibold))
+                                    .foregroundStyle(isSel ? .white : VeloceTheme.textPrimary)
+                                    .padding(.horizontal, 13)
+                                    .padding(.vertical, 8)
+                                    .background(
+                                        Capsule()
+                                            .fill(isSel ? VeloceTheme.accent : VeloceTheme.surfaceRaised)
+                                            .overlay(
+                                                Capsule()
+                                                    .strokeBorder(
+                                                        isSel ? VeloceTheme.accent : VeloceTheme.divider,
+                                                        lineWidth: 1
+                                                    )
+                                            )
+                                    )
+                            }
+                            .buttonStyle(.plain)
+                            .animation(.spring(response: 0.2), value: isSel)
+                        }
+                    }
+                    .padding(.horizontal, 2)
+                }
+                .transition(.opacity.combined(with: .move(edge: .top)))
             }
 
             // Progress bar

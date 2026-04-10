@@ -17,9 +17,22 @@
 		0D8CE8A02F874FC200309833 /* Veloce.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Veloce.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		0DC20BC22F89068F00AE2A1E /* Exceptions for "Veloce" folder in "Veloce" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 0D8CE89F2F874FC200309833 /* Veloce */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		0D8CE8A22F874FC200309833 /* Veloce */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				0DC20BC22F89068F00AE2A1E /* Exceptions for "Veloce" folder in "Veloce" target */,
+			);
 			path = Veloce;
 			sourceTree = "<group>";
 		};
@@ -275,6 +288,7 @@
 				DEVELOPMENT_TEAM = 553U32259K;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Veloce/Info.plist;
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Veloce uses your microphone to add expenses by voice.";
 				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "Veloce uses speech recognition to convert voice into expense entries.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -310,6 +324,7 @@
 				DEVELOPMENT_TEAM = 553U32259K;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Veloce/Info.plist;
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Veloce uses your microphone to add expenses by voice.";
 				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "Veloce uses speech recognition to convert voice into expense entries.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;

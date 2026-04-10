@@ -15,7 +15,7 @@ enum AIService {
         guard let amount = extractAmount(from: lower), amount > 0 else { return nil }
 
         let categoryName = detectCategory(from: lower)
-        let title        = buildTitle(from: raw, lower: lower, fallback: categoryName)
+        let title        = buildTitle(from: raw, lower: lower, fallback: categoryName ?? "Expense")
         let date         = detectDate(from: lower)
 
         return ParsedExpense(title: title, amount: amount, categoryName: categoryName, date: date)
@@ -117,9 +117,12 @@ enum AIService {
         return nil
     }
 
-    // MARK: - Category detection (priority-ordered rules)
+    // MARK: - Category detection
+    // Returns nil when no keyword matches — caller should ask user to pick a group.
 
-    private static func detectCategory(from text: String) -> String {
+    private static func detectCategory(from text: String) -> String? {
+        // Priority-ordered keyword rules for default category names.
+        // The ViewModel layer also fuzzy-matches against user's actual category names.
         let rules: [(String, [String])] = [
             ("Food", [
                 "ăn", "cơm", "phở", "bún", "cháo", "bánh", "bún bò", "bún chả",
@@ -127,46 +130,62 @@ enum AIService {
                 "pizza", "burger", "sushi", "lẩu", "gà", "hải sản", "cá",
                 "mì", "hủ tiếu", "bánh mì", "xôi", "chè", "nước", "nước ngọt",
                 "milk tea", "breakfast", "lunch", "dinner", "snack", "kem",
-                "siêu thị", "market", "cgv", "kfc", "mcdonald", "jollibee",
+                "siêu thị", "grocery", "market", "kfc", "mcdonald", "jollibee",
+                "eat", "food", "drink", "restaurant", "cafe",
             ]),
             ("Transport", [
                 "grab", "uber", "taxi", "xe ôm", "xeom", "gojek", "be ",
                 "bus", "buýt", "tàu", "tàu điện", "metro", "vé tàu", "vé xe",
-                "xăng", "petrol", "đổ xăng", "bãi xe", "parking",
+                "xăng", "petrol", "gas", "đổ xăng", "bãi xe", "parking",
                 "máy bay", "vé máy bay", "flight", "grab bike", "grab car",
+                "lyft", "transport", "fare", "fuel",
             ]),
             ("Shopping", [
                 "mua", "shop", "quần", "áo", "giày", "dép", "túi", "ví",
-                "fashion", "clothes", "zara", "h&m", "uniqlo", "muji",
+                "fashion", "clothes", "clothing", "zara", "h&m", "uniqlo", "muji",
                 "lazada", "shopee", "tiki", "amazon", "order", "haul",
                 "đồng hồ", "nhẫn", "trang sức", "phụ kiện", "case phone",
+                "buy", "purchase",
             ]),
             ("Bills", [
-                "điện", "nước", "wifi", "internet", "4g", "5g",
+                "điện", "wifi", "internet", "4g", "5g",
                 "bill", "hoá đơn", "rent", "thuê nhà", "phòng trọ",
-                "phone bill", "điện thoại", "bảo hiểm", "tiền nhà",
-                "insurance", "subscription", "icloud", "google",
+                "phone bill", "bảo hiểm", "tiền nhà",
+                "insurance", "subscription", "icloud", "google one",
+                "electric", "utility", "water bill",
             ]),
             ("Health", [
                 "gym", "fitness", "yoga", "pilates", "thể dục",
                 "thuốc", "bác sĩ", "bệnh viện", "khám", "khám bệnh",
                 "hospital", "doctor", "clinic", "pharmacy", "nhà thuốc",
                 "vitamin", "supplement", "thực phẩm chức năng",
+                "medicine", "dental", "health",
             ]),
             ("Entertainment", [
-                "phim", "cinema", "cgv", "bhd", "lotte", "movie",
+                "phim", "cinema", "bhd", "lotte", "movie",
                 "game", "steam", "netflix", "spotify", "youtube premium",
                 "concert", "show", "karaoke", "bowling", "billiards",
                 "vé", "ticket", "giải trí", "sách", "book",
+                "entertainment", "music", "disney",
             ]),
         ]
 
+        var bestMatch: String? = nil
+        var bestScore = 0
+
         for (category, keywords) in rules {
-            for kw in keywords where text.contains(kw) {
-                return category
+            var score = 0
+            for kw in keywords {
+                if text.contains(kw) { score += kw.count } // longer keyword = higher confidence
+            }
+            if score > bestScore {
+                bestScore = score
+                bestMatch = category
             }
         }
-        return "Other"
+
+        // Require at least one keyword character matched; otherwise unknown
+        return bestScore > 0 ? bestMatch : nil
     }
 
     // MARK: - Title cleanup

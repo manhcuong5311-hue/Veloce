@@ -1,4 +1,5 @@
 import Foundation
+import FirebaseAuth
 import FirebaseFunctions
 
 // MARK: - Context passed to the Cloud Function
@@ -33,6 +34,11 @@ enum OpenAIService {
         messages: [OpenAIMessage],
         context:  AppContext
     ) async throws -> String {
+        // Force-refresh ID token so Firebase Functions always receives a valid auth header
+        if let user = Auth.auth().currentUser {
+            _ = try? await user.getIDToken(forcingRefresh: true)
+        }
+
         let fn       = Functions.functions()
         let callable = fn.httpsCallable("chatWithAI")
 

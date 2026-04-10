@@ -1,4 +1,5 @@
 import SwiftUI
+internal import Speech
 
 // MARK: - OnboardingView (3 pages)
 
@@ -258,6 +259,7 @@ private struct Page3: View {
     @Binding var parsedResult: String?
     let onFinish: () -> Void
 
+    @StateObject private var speech = SpeechService()
     @State private var show    = false
     @State private var loading = false
     @FocusState private var focused: Bool
@@ -267,32 +269,45 @@ private struct Page3: View {
             Spacer()
 
             VStack(spacing: 32) {
-                // Icon
-                ZStack {
-                    Circle()
-                        .fill(VeloceTheme.accentBg)
-                        .frame(width: 110, height: 110)
-                    Circle()
-                        .fill(VeloceTheme.accent.opacity(0.10))
-                        .frame(width: 160)
-                        .blur(radius: 24)
-                    Image(systemName: "mic.circle.fill")
-                        .font(.system(size: 52))
-                        .foregroundStyle(VeloceTheme.accent)
-                        .symbolEffect(.pulse, isActive: focused)
+                // Tappable mic hero button
+                Button(action: micTapped) {
+                    ZStack {
+                        Circle()
+                            .fill(speech.isListening
+                                  ? VeloceTheme.over.opacity(0.12)
+                                  : VeloceTheme.accentBg)
+                            .frame(width: 110, height: 110)
+                        Circle()
+                            .fill((speech.isListening ? VeloceTheme.over : VeloceTheme.accent).opacity(0.10))
+                            .frame(width: 160)
+                            .blur(radius: 24)
+                        Image(systemName: speech.isListening
+                              ? "stop.circle.fill"
+                              : "mic.circle.fill")
+                            .font(.system(size: 52))
+                            .foregroundStyle(speech.isListening
+                                            ? VeloceTheme.over
+                                            : VeloceTheme.accent)
+                            .symbolEffect(.pulse, isActive: speech.isListening)
+                    }
                 }
+                .buttonStyle(.plain)
                 .scaleEffect(show ? 1 : 0.7)
                 .opacity(show ? 1 : 0)
+                .animation(.spring(response: 0.3), value: speech.isListening)
 
                 VStack(spacing: 12) {
                     Text("Give it a try")
                         .font(.system(size: 36, weight: .bold, design: .rounded))
                         .foregroundStyle(VeloceTheme.textPrimary)
 
-                    Text("Type an expense and watch Veloce parse it instantly.")
+                    Text(speech.isListening
+                         ? "Listening… tap the mic to stop"
+                         : "Tap the mic to speak, or type an expense below")
                         .font(.system(size: 15))
                         .foregroundStyle(VeloceTheme.textSecondary)
                         .multilineTextAlignment(.center)
+                        .animation(.easeInOut(duration: 0.2), value: speech.isListening)
                 }
                 .opacity(show ? 1 : 0)
                 .offset(y: show ? 0 : 14)
@@ -300,10 +315,16 @@ private struct Page3: View {
                 // Input + result
                 VStack(spacing: 10) {
                     HStack(spacing: 12) {
-                        Image(systemName: loading ? "ellipsis" : "mic.fill")
+                        Image(systemName: loading
+                              ? "ellipsis"
+                              : speech.isListening ? "waveform" : "mic.fill")
                             .font(.system(size: 14, weight: .semibold))
-                            .foregroundStyle(focused ? VeloceTheme.accent : VeloceTheme.textTertiary)
+                            .foregroundStyle(speech.isListening
+                                            ? VeloceTheme.over
+                                            : focused ? VeloceTheme.accent
+                                            : VeloceTheme.textTertiary)
                             .contentTransition(.symbolEffect(.replace))
+                            .symbolEffect(.variableColor, isActive: speech.isListening)
                             .animation(.default, value: loading)
 
                         TextField("coffee 40k", text: $input)
@@ -330,7 +351,9 @@ private struct Page3: View {
                             .overlay(
                                 RoundedRectangle(cornerRadius: 16, style: .continuous)
                                     .strokeBorder(
-                                        focused ? VeloceTheme.accent.opacity(0.45) : Color.clear,
+                                        speech.isListening
+                                            ? VeloceTheme.over.opacity(0.5)
+                                            : focused ? VeloceTheme.accent.opacity(0.45) : Color.clear,
                                         lineWidth: 1.5
                                     )
                             )
@@ -375,11 +398,37 @@ private struct Page3: View {
             withAnimation(.spring(response: 0.72, dampingFraction: 0.78).delay(0.08)) { show = true }
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.65) { focused = true }
         }
+        .task { await speech.requestPermissions() }
+        .onChange(of: speech.recognizedText) { _, text in
+            if !text.isEmpty { input = text }
+        }
+        .onChange(of: speech.isListening) { _, listening in
+            // Auto-submit when mic recognition finishes
+            if !listening && !speech.recognizedText.isEmpty {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { tryParse() }
+            }
+        }
+    }
+
+    // MARK: - Actions
+
+    private func micTapped() {
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        guard speech.authStatus == .authorized else { return }
+        focused = false
+        if speech.isListening {
+            speech.stopListening()
+        } else {
+            input = ""
+            parsedResult = nil
+            speech.startListening()
+        }
     }
 
     private func tryParse() {
         let text = input.trimmingCharacters(in: .whitespaces)
         guard !text.isEmpty else { return }
+        speech.stopListening()
         focused  = false
         loading  = true
 
@@ -387,9 +436,9 @@ private struct Page3: View {
             withAnimation(.spring(response: 0.4)) {
                 if let parsed = AIService.parseExpense(text) {
                     let amt = parsed.amount >= 1_000
-                        ? "\(Int(parsed.amount / 1_000))k"
-                        : "\(Int(parsed.amount))"
-                    parsedResult = "Added: \(parsed.title.capitalized) — \(amt)đ"
+                        ? parsed.amount.toCompactCurrency()
+                        : parsed.amount.toCurrencyString()
+                    parsedResult = "Added: \(parsed.title.capitalized) — \(amt)"
                 } else {
                     parsedResult = "Added: \(text.capitalized)"
                 }

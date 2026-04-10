@@ -15,6 +15,7 @@ struct AddExpenseSheet: View {
     @FocusState private var amountFocused: Bool
 
     private var parsedAmount: Double? {
+        // Strip any formatting separators before parsing
         Double(amountText.filter { $0.isNumber })
     }
     private var isValid: Bool {
@@ -69,6 +70,13 @@ struct AddExpenseSheet: View {
                 .tracking(0.3)
 
             HStack(alignment: .lastTextBaseline, spacing: 4) {
+                if AppCurrency.current.symbolLeading {
+                    Text(AppCurrency.current.symbol)
+                        .font(.system(size: 26, weight: .semibold))
+                        .foregroundStyle(VeloceTheme.textTertiary)
+                        .offset(y: -4)
+                }
+
                 TextField("0", text: $amountText)
                     .font(.system(size: 52, weight: .bold, design: .rounded))
                     .foregroundStyle(VeloceTheme.textPrimary)
@@ -77,11 +85,18 @@ struct AddExpenseSheet: View {
                     .multilineTextAlignment(.center)
                     .focused($amountFocused)
                     .frame(maxWidth: 220)
+                    .onChange(of: amountText) { _, newVal in
+                        let digits = newVal.filter { $0.isNumber }
+                        let formatted = Double.formatAmountInput(digits)
+                        if formatted != amountText { amountText = formatted }
+                    }
 
-                Text("đ")
-                    .font(.system(size: 26, weight: .semibold))
-                    .foregroundStyle(VeloceTheme.textTertiary)
-                    .offset(y: -4)
+                if !AppCurrency.current.symbolLeading {
+                    Text(AppCurrency.current.symbol)
+                        .font(.system(size: 26, weight: .semibold))
+                        .foregroundStyle(VeloceTheme.textTertiary)
+                        .offset(y: -4)
+                }
             }
 
             if let amt = parsedAmount, amt > 0 {
@@ -235,6 +250,12 @@ struct EditExpenseSheet: View {
                             .font(.system(size: 12, weight: .medium))
                             .foregroundStyle(VeloceTheme.textSecondary)
                         HStack(alignment: .lastTextBaseline, spacing: 4) {
+                            if AppCurrency.current.symbolLeading {
+                                Text(AppCurrency.current.symbol)
+                                    .font(.system(size: 22, weight: .semibold))
+                                    .foregroundStyle(VeloceTheme.textTertiary)
+                                    .offset(y: -3)
+                            }
                             TextField("0", text: $amountText)
                                 .font(.system(size: 46, weight: .bold, design: .rounded))
                                 .foregroundStyle(VeloceTheme.textPrimary)
@@ -242,10 +263,17 @@ struct EditExpenseSheet: View {
                                 .keyboardType(.numberPad)
                                 .multilineTextAlignment(.center)
                                 .frame(maxWidth: 200)
-                            Text("đ")
-                                .font(.system(size: 22, weight: .semibold))
-                                .foregroundStyle(VeloceTheme.textTertiary)
-                                .offset(y: -3)
+                                .onChange(of: amountText) { _, newVal in
+                                    let digits = newVal.filter { $0.isNumber }
+                                    let formatted = Double.formatAmountInput(digits)
+                                    if formatted != amountText { amountText = formatted }
+                                }
+                            if !AppCurrency.current.symbolLeading {
+                                Text(AppCurrency.current.symbol)
+                                    .font(.system(size: 22, weight: .semibold))
+                                    .foregroundStyle(VeloceTheme.textTertiary)
+                                    .offset(y: -3)
+                            }
                         }
                     }
                     .frame(maxWidth: .infinity)

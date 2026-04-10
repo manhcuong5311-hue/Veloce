@@ -8,8 +8,10 @@ struct InputBarView: View {
     @State private var text = ""
     @FocusState private var textFocused: Bool
     @State private var showPermissionAlert = false
-    @State private var parseFailed = false
+    @State private var parseFailed         = false
+    @State private var pendingParsed: ParsedExpense? = nil
 
+    var onAITap:    () -> Void = {}
     var onManualAdd: () -> Void = {}
 
     var body: some View {
@@ -37,6 +39,13 @@ struct InputBarView: View {
         .task { await speech.requestPermissions() }
         .onChange(of: speech.recognizedText) { _, newVal in
             if !newVal.isEmpty { text = newVal }
+        }
+        .sheet(item: $pendingParsed) { parsed in
+            CategoryPickerSheet(parsed: parsed) {
+                text        = ""
+                textFocused = false
+            }
+            .environmentObject(vm)
         }
     }
 
@@ -67,13 +76,13 @@ struct InputBarView: View {
     // MARK: - Main input row
 
     private var inputRow: some View {
-        HStack(spacing: 10) {
-            // Text field
-            HStack(spacing: 10) {
-                Image(systemName: "magnifyingglass")
-                    .font(.system(size: 14))
-                    .foregroundStyle(VeloceTheme.textTertiary)
+        HStack(spacing: 8) {
 
+            // ── AI button (always left) ──────────────────────────
+            aiButton
+
+            // ── Text field ───────────────────────────────────────
+            HStack(spacing: 8) {
                 TextField("Ăn phở 50k, Grab 30k…", text: $text)
                     .font(.system(size: 15))
                     .foregroundStyle(VeloceTheme.textPrimary)
@@ -89,6 +98,7 @@ struct InputBarView: View {
                             .font(.system(size: 16))
                             .foregroundStyle(VeloceTheme.textTertiary)
                     }
+                    .transition(.scale.combined(with: .opacity))
                 }
             }
             .padding(.horizontal, 14)
@@ -106,16 +116,31 @@ struct InputBarView: View {
             )
             .animation(.easeInOut(duration: 0.2), value: parseFailed)
 
-            // Action buttons
+            // ── Right-side action buttons ────────────────────────
             if !text.isEmpty {
                 sendButton.transition(.scale.combined(with: .opacity))
-            } else if !textFocused {
+            } else {
                 micButton.transition(.scale.combined(with: .opacity))
                 addButton.transition(.scale.combined(with: .opacity))
             }
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+    }
+
+    // MARK: - AI button
+
+    private var aiButton: some View {
+        Button(action: onAITap) {
+            ZStack {
+                Circle()
+                    .fill(VeloceTheme.accentBg)
+                    .frame(width: 44, height: 44)
+                Image(systemName: "sparkles")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(VeloceTheme.accent)
+            }
+        }
     }
 
     private var sendButton: some View {
@@ -164,11 +189,15 @@ struct InputBarView: View {
         let trimmed = text.trimmingCharacters(in: .whitespaces)
         guard !trimmed.isEmpty else { return }
         speech.stopListening()
-        let ok = vm.parseAndAddExpense(from: trimmed)
-        if ok {
+
+        switch vm.parseExpenseResult(from: trimmed) {
+        case .added:
             text = ""
             textFocused = false
-        } else {
+        case .needsCategory(let parsed):
+            // Show category picker — keep text visible until user picks
+            pendingParsed = parsed
+        case .failed:
             withAnimation { parseFailed = true }
             UINotificationFeedbackGenerator().notificationOccurred(.error)
             Task {
@@ -194,5 +223,112 @@ struct InputBarView: View {
         }
         if speech.isListening { finishListening() }
         else { text = ""; speech.startListening() }
+    }
+}
+
+// MARK: - Category Picker Sheet
+
+struct CategoryPickerSheet: View {
+    @EnvironmentObject var vm: ExpenseViewModel
+    @Environment(\.dismiss) private var dismiss
+
+    let parsed: ParsedExpense
+    var onComplete: () -> Void = {}
+
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                VeloceTheme.bg.ignoresSafeArea()
+
+                ScrollView(showsIndicators: false) {
+                    VStack(spacing: 20) {
+                        // ── Parsed expense preview ───────────────
+                        HStack(spacing: 14) {
+                            ZStack {
+                                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                    .fill(VeloceTheme.accentBg)
+                                    .frame(width: 46, height: 46)
+                                Image(systemName: "tag.fill")
+                                    .font(.system(size: 18, weight: .semibold))
+                                    .foregroundStyle(VeloceTheme.accent)
+                            }
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text(parsed.title)
+                                    .font(.system(size: 16, weight: .semibold))
+                                    .foregroundStyle(VeloceTheme.textPrimary)
+                                    .lineLimit(1)
+                                Text("Which group does this belong to?")
+                                    .font(.system(size: 13))
+                                    .foregroundStyle(VeloceTheme.textSecondary)
+                            }
+                            Spacer()
+                            Text(parsed.amount.toCompactCurrency())
+                                .font(.system(size: 18, weight: .bold, design: .rounded))
+                                .foregroundStyle(VeloceTheme.textPrimary)
+                        }
+                        .veloceCard()
+
+                        // ── Category grid ────────────────────────
+                        LazyVGrid(
+                            columns: Array(repeating: GridItem(.flexible(), spacing: 12), count: 3),
+                            spacing: 12
+                        ) {
+                            ForEach(vm.categories.filter { !$0.isHidden }) { cat in
+                                Button(action: { pick(cat) }) {
+                                    VStack(spacing: 10) {
+                                        ZStack {
+                                            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                                .fill(Color(hex: cat.colorHex).opacity(0.14))
+                                                .frame(width: 54, height: 54)
+                                            Image(systemName: cat.icon)
+                                                .font(.system(size: 22, weight: .medium))
+                                                .foregroundStyle(Color(hex: cat.colorHex))
+                                        }
+                                        Text(cat.name)
+                                            .font(.system(size: 12, weight: .semibold))
+                                            .foregroundStyle(VeloceTheme.textPrimary)
+                                            .lineLimit(1)
+                                    }
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.vertical, 14)
+                                    .background(
+                                        RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                            .fill(VeloceTheme.surface)
+                                            .shadow(color: .black.opacity(0.05), radius: 8, y: 2)
+                                    )
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                    }
+                    .padding(20)
+                    .padding(.bottom, 24)
+                }
+            }
+            .navigationTitle("Choose Group")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button("Cancel") { dismiss() }
+                        .foregroundStyle(VeloceTheme.textSecondary)
+                }
+            }
+        }
+        .presentationDetents([.medium, .large])
+        .presentationDragIndicator(.visible)
+        .presentationBackground(VeloceTheme.bg)
+        .preferredColorScheme(.light)
+    }
+
+    private func pick(_ category: Category) {
+        vm.addExpense(Expense(
+            title:      parsed.title,
+            amount:     parsed.amount,
+            categoryId: category.id,
+            date:       parsed.date
+        ))
+        UINotificationFeedbackGenerator().notificationOccurred(.success)
+        onComplete()
+        dismiss()
     }
 }

@@ -127,7 +127,7 @@ struct AuthView: View {
                 label: "Continue with Google",
                 icon:  "globe"
             ) {
-                authVM.signInWithGoogle()
+                Task { await authVM.signInWithGoogle() }
             }
 
             // ── Divider ────────────────────────────────────────
