@@ -21,11 +21,20 @@ final class SubscriptionManager: ObservableObject {
     @Published private(set) var products: [Product] = []
     @Published var errorMessage: String? = nil
 
-    // AI usage tracking (for free-tier limiting)
+    // AI usage tracking
     @Published private(set) var aiMessagesUsedToday: Int = 0
     static let freeAILimit = 3
+    static let proAILimit  = 50   // soft cap — never surfaced in paywall copy
 
-    var canUseAI: Bool { isProUser || aiMessagesUsedToday < SubscriptionManager.freeAILimit }
+    var canUseAI: Bool {
+        isProUser
+            ? aiMessagesUsedToday < SubscriptionManager.proAILimit
+            : aiMessagesUsedToday < SubscriptionManager.freeAILimit
+    }
+    /// True only when a Pro user has hit the silent daily soft cap
+    var isAtOptimalLimit: Bool {
+        isProUser && aiMessagesUsedToday >= SubscriptionManager.proAILimit
+    }
     var freeAIRemaining: Int { max(0, SubscriptionManager.freeAILimit - aiMessagesUsedToday) }
 
     private var transactionListener: Task<Void, Error>?

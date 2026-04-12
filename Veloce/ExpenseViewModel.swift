@@ -212,6 +212,50 @@ final class ExpenseViewModel: ObservableObject {
         }
     }
 
+    // MARK: Export / Import
+
+    func exportJSON() throws -> Data {
+        let payload = VeloceExportData(
+            exportDate:    Date(),
+            version:       "1.0",
+            categories:    categories,
+            expenses:      expenses,
+            monthlyIncome: monthlyIncome,
+            savingGoal:    savingGoal
+        )
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        encoder.outputFormatting     = [.prettyPrinted, .sortedKeys]
+        return try encoder.encode(payload)
+    }
+
+    func importJSON(_ data: Data) throws {
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        let payload = try decoder.decode(VeloceExportData.self, from: data)
+
+        // Recompute .spent from the imported expenses so totals are always consistent
+        var rebuilt = payload.categories.map { cat -> Category in
+            var c = cat
+            c.spent = payload.expenses
+                .filter { $0.categoryId == cat.id }
+                .reduce(0) { $0 + $1.amount }
+            return c
+        }
+
+        withAnimation(.spring(response: 0.4)) {
+            self.categories    = rebuilt
+            self.expenses      = payload.expenses
+            self.monthlyIncome = payload.monthlyIncome
+            self.savingGoal    = payload.savingGoal
+        }
+        let store = PersistenceStore.shared
+        store.saveCategories(rebuilt)
+        store.saveExpenses(payload.expenses)
+        store.saveMonthlyIncome(payload.monthlyIncome)
+        store.saveSavingGoal(payload.savingGoal)
+    }
+
     // MARK: AI
 
     func insight(for category: Category) -> AIInsight? {

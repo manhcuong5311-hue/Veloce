@@ -186,7 +186,7 @@ struct IconPickerSheet: View {
             Image(systemName: "magnifyingglass")
                 .font(.system(size: 32, weight: .light))
                 .foregroundStyle(VeloceTheme.textTertiary)
-            Text("No icons match "\(searchText)"")
+            Text("No icons match \"\(searchText)\"")
                 .font(.system(size: 14))
                 .foregroundStyle(VeloceTheme.textSecondary)
         }

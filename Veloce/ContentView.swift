@@ -86,7 +86,9 @@ struct ContentView: View {
             PaywallView().environmentObject(subManager)
         }
         .sheet(isPresented: $showEditGroups) {
-            EditGroupsSheet().environmentObject(vm)
+            EditGroupsSheet()
+                .environmentObject(vm)
+                .environmentObject(subManager)
         }
         .sheet(isPresented: $showAIAssistant) {
             AIAssistantView()
@@ -185,6 +187,43 @@ private struct SummaryHeaderView: View {
     }
 }
 
+// MARK: - Spending Panel State
+
+private enum SpendingPanelState: String {
+    case compact, medium, expanded
+
+    var maxBarHeight: CGFloat {
+        switch self {
+        case .compact:  return 72
+        case .medium:   return 160
+        case .expanded: return 220
+        }
+    }
+
+    /// Show category name + amount labels
+    var showLabels: Bool { self != .compact }
+    /// Show % spent badge
+    var showPercentage: Bool { self == .expanded }
+
+    /// Next state when dragging up (expand)
+    var larger: SpendingPanelState {
+        switch self {
+        case .compact:  return .medium
+        case .medium:   return .expanded
+        case .expanded: return .expanded
+        }
+    }
+
+    /// Next state when dragging down (collapse)
+    var smaller: SpendingPanelState {
+        switch self {
+        case .compact:  return .compact
+        case .medium:   return .compact
+        case .expanded: return .medium
+        }
+    }
+}
+
 // MARK: - Columns Card
 
 private struct ColumnsCard: View {
@@ -199,8 +238,23 @@ private struct ColumnsCard: View {
     @State private var activeCategoryId: UUID?  = nil
     @State private var fixedTotalBudget: Double = 0   // total frozen on entry
 
+    // Panel resize state
+    @AppStorage("spending_panel_state") private var savedState: String = SpendingPanelState.medium.rawValue
+    @State private var panelState:  SpendingPanelState = .medium
+    @State private var dragOffset:  CGFloat = 0
+    @State private var isDragging:  Bool    = false
+    @AppStorage("spending_hint_seen") private var hintSeen: Bool = false
+
     private var remainingBudget: Double {
         fixedTotalBudget - vm.totalBudget
+    }
+
+    /// Live bar height that tracks the finger during drag, then snaps on release
+    private var effectiveBarHeight: CGFloat {
+        // Negative dragOffset = dragging up = expand = more height
+        let adjusted = panelState.maxBarHeight - dragOffset
+        return min(max(adjusted, SpendingPanelState.compact.maxBarHeight),
+                   SpendingPanelState.expanded.maxBarHeight)
     }
 
     var body: some View {
@@ -212,7 +266,7 @@ private struct ColumnsCard: View {
                 normalHeader
             }
 
-            // ── Hint text ────────────────────────────────────────
+            // ── Hint text (edit-budget mode) ─────────────────────
             if isEditingBudget {
                 HStack(spacing: 5) {
                     Image(systemName: "hand.draw")
@@ -254,14 +308,18 @@ private struct ColumnsCard: View {
                     } else {
                         ForEach(vm.visibleCategories) { cat in
                             CategoryColumnView(
-                                category:      cat,
-                                barRatio:      vm.barRatio(for: cat),
-                                categoryColor: vm.categoryColor(for: cat),
-                                statusColor:   vm.statusColor(for: cat),
-                                isHighlighted: vm.highlightedCategoryId == cat.id,
-                                onTap:         { onTap(cat) },
-                                onLongPress:   { onLongPress(cat) },
-                                onSwipeUp:     { onSwipeUp(cat) }
+                                category:       cat,
+                                barRatio:       vm.barRatio(for: cat),
+                                categoryColor:  vm.categoryColor(for: cat),
+                                statusColor:    vm.statusColor(for: cat),
+                                isHighlighted:  vm.highlightedCategoryId == cat.id,
+                                maxBarH:        effectiveBarHeight,
+                                showLabels:     panelState.showLabels,
+                                showPercentage: panelState.showPercentage,
+                                isResizing:     isDragging,
+                                onTap:          { onTap(cat) },
+                                onLongPress:    { onLongPress(cat) },
+                                onSwipeUp:      { onSwipeUp(cat) }
                             )
                             .equatable()
                         }
@@ -273,9 +331,102 @@ private struct ColumnsCard: View {
                 .padding(.top, isEditingBudget ? 10 : 0)
                 .padding(.bottom, 4)
             }
+
+            // ── Resize handle (hidden in edit mode) ──────────────
+            if !isEditingBudget {
+                resizeHandleArea
+            }
         }
         .veloceCard(radius: 22, padding: 20)
+        // Extra elevation shadow while dragging
+        .shadow(
+            color: .black.opacity(isDragging ? 0.10 : 0),
+            radius: 28, x: 0, y: 12
+        )
+        .scaleEffect(isDragging ? 1.006 : 1.0)
         .animation(.spring(response: 0.38, dampingFraction: 0.82), value: isEditingBudget)
+        .animation(.spring(response: 0.28), value: isDragging)
+        .onAppear {
+            panelState = SpendingPanelState(rawValue: savedState) ?? .medium
+        }
+    }
+
+    // MARK: - Resize handle
+
+    private var resizeHandleArea: some View {
+        VStack(spacing: 6) {
+            // First-time hint
+            if !hintSeen {
+                HStack(spacing: 4) {
+                    Image(systemName: "arrow.up.and.down")
+                        .font(.system(size: 9, weight: .medium))
+                    Text("Drag to expand")
+                        .font(.system(size: 11, weight: .medium))
+                }
+                .foregroundStyle(VeloceTheme.textTertiary)
+                .transition(.opacity)
+                .onAppear {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 4) {
+                        withAnimation(.easeOut(duration: 0.4)) { hintSeen = true }
+                    }
+                }
+            }
+
+            // Pill handle
+            Capsule()
+                .fill(isDragging ? VeloceTheme.textSecondary : VeloceTheme.divider)
+                .frame(width: isDragging ? 52 : 36, height: isDragging ? 5 : 4)
+                .animation(.spring(response: 0.2), value: isDragging)
+                .frame(maxWidth: .infinity)
+                // Tall hit target so users can grab it easily
+                .frame(height: 24)
+                .contentShape(Rectangle())
+                .gesture(resizeGesture)
+        }
+    }
+
+    // MARK: - Resize gesture
+
+    private var resizeGesture: some Gesture {
+        DragGesture(minimumDistance: 4, coordinateSpace: .local)
+            .onChanged { value in
+                if !isDragging {
+                    withAnimation(.spring(response: 0.2)) { isDragging = true }
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    if !hintSeen {
+                        withAnimation(.easeOut(duration: 0.3)) { hintSeen = true }
+                    }
+                }
+                dragOffset = value.translation.height
+            }
+            .onEnded { value in
+                // Incorporate a fraction of the throw velocity for a more natural feel
+                let velocity  = value.predictedEndTranslation.height - value.translation.height
+                let projected = value.translation.height + velocity * 0.25
+                let threshold: CGFloat = 30
+
+                let next: SpendingPanelState
+                if projected < -threshold {
+                    next = panelState.larger
+                } else if projected > threshold {
+                    next = panelState.smaller
+                } else {
+                    next = panelState
+                }
+
+                let changed = next != panelState
+
+                withAnimation(.spring(response: 0.46, dampingFraction: 0.78)) {
+                    panelState = next
+                    dragOffset = 0
+                    isDragging = false
+                }
+
+                savedState = next.rawValue
+                if changed {
+                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                }
+            }
     }
 
     // MARK: - Headers

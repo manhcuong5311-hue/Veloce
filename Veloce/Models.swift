@@ -82,3 +82,14 @@ struct AIAdvice {
     var suggestion: String
     var potentialSaving: Double
 }
+
+// MARK: - Export / Import Envelope
+
+struct VeloceExportData: Codable {
+    let exportDate:    Date
+    let version:       String
+    let categories:    [Category]
+    let expenses:      [Expense]
+    let monthlyIncome: Double
+    let savingGoal:    Double
+}

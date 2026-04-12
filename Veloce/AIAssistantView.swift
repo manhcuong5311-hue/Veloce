@@ -166,11 +166,19 @@ struct AIAssistantView: View {
         let text = inputText.trimmingCharacters(in: .whitespaces)
         guard !text.isEmpty else { return }
 
-        if !subManager.isProUser && !subManager.canUseAI {
-            messages.append(ChatMessage(
-                role: .error,
-                content: "You've used all \(SubscriptionManager.freeAILimit) free messages today. Upgrade to Pro for unlimited access."
-            ))
+        if !subManager.canUseAI {
+            if subManager.isProUser {
+                // Silent soft-cap — never mention the number
+                messages.append(ChatMessage(
+                    role: .error,
+                    content: "You've reached today's optimal usage limit. Try again tomorrow."
+                ))
+            } else {
+                messages.append(ChatMessage(
+                    role: .error,
+                    content: "You've used all \(SubscriptionManager.freeAILimit) free messages today. Upgrade to Premium for unlimited AI insights."
+                ))
+            }
             return
         }
 
