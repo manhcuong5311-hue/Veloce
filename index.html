@@ -1,0 +1,1095 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Veloce — Legal</title>
+  <style>
+    /* ── Tokens ───────────────────────────────────────────────── */
+    :root {
+      --bg:             #F5F3EF;
+      --surface:        #FFFFFF;
+      --surface-raised: #F0EDE8;
+      --text-primary:   #1C1B1A;
+      --text-secondary: #8A8680;
+      --text-tertiary:  #C2BEB8;
+      --accent:         #7B6CF0;
+      --accent-bg:      #EEEAFD;
+      --ok:             #6BBF8E;
+      --caution:        #E8B86D;
+      --over:           #E88A7A;
+      --divider:        #ECEAE5;
+      --radius-sm:      10px;
+      --radius-md:      16px;
+      --radius-lg:      24px;
+      --shadow-sm:      0 1px 3px rgba(0,0,0,.05), 0 4px 12px rgba(0,0,0,.04);
+      --shadow-md:      0 2px 8px rgba(0,0,0,.06), 0 12px 32px rgba(0,0,0,.06);
+      --shadow-lg:      0 4px 16px rgba(0,0,0,.08), 0 24px 48px rgba(0,0,0,.08);
+    }
+
+    /* ── Reset ────────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text",
+                   "Segoe UI", system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text-primary);
+      line-height: 1.65;
+      -webkit-font-smoothing: antialiased;
+      min-height: 100vh;
+    }
+
+    /* ── Header ───────────────────────────────────────────────── */
+    header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--divider);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      background: rgba(255,255,255,.88);
+    }
+
+    .header-inner {
+      max-width: 760px;
+      margin: 0 auto;
+      padding: 0 24px;
+      height: 64px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      text-decoration: none;
+    }
+
+    .logo-mark {
+      width: 36px;
+      height: 36px;
+      border-radius: 10px;
+      background: linear-gradient(135deg, #9B8FF5 0%, #7B6CF0 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 2px 8px rgba(123,108,240,.35);
+      flex-shrink: 0;
+    }
+
+    .logo-mark svg {
+      width: 18px;
+      height: 18px;
+      fill: #fff;
+    }
+
+    .logo-text {
+      font-size: 17px;
+      font-weight: 700;
+      color: var(--text-primary);
+      letter-spacing: -.3px;
+    }
+
+    .header-badge {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--accent);
+      background: var(--accent-bg);
+      padding: 3px 10px;
+      border-radius: 20px;
+      letter-spacing: .1px;
+    }
+
+    /* ── Tab switcher ─────────────────────────────────────────── */
+    .tabs-wrap {
+      background: var(--surface);
+      border-bottom: 1px solid var(--divider);
+    }
+
+    .tabs {
+      max-width: 760px;
+      margin: 0 auto;
+      padding: 0 24px;
+      display: flex;
+      gap: 4px;
+    }
+
+    .tab-btn {
+      background: none;
+      border: none;
+      cursor: pointer;
+      font-family: inherit;
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--text-secondary);
+      padding: 14px 16px 12px;
+      position: relative;
+      transition: color .2s ease;
+      letter-spacing: -.1px;
+      white-space: nowrap;
+    }
+
+    .tab-btn::after {
+      content: "";
+      position: absolute;
+      left: 16px;
+      right: 16px;
+      bottom: 0;
+      height: 2px;
+      border-radius: 2px 2px 0 0;
+      background: var(--accent);
+      transform: scaleX(0);
+      transition: transform .25s cubic-bezier(.34,1.56,.64,1);
+    }
+
+    .tab-btn.active {
+      color: var(--accent);
+    }
+
+    .tab-btn.active::after {
+      transform: scaleX(1);
+    }
+
+    /* ── Main layout ──────────────────────────────────────────── */
+    main {
+      max-width: 760px;
+      margin: 0 auto;
+      padding: 40px 24px 80px;
+    }
+
+    /* ── Panels ───────────────────────────────────────────────── */
+    .panel {
+      display: none;
+      animation: fadeUp .35s cubic-bezier(.22,1,.36,1) both;
+    }
+
+    .panel.active { display: block; }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(14px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ── Hero ─────────────────────────────────────────────────── */
+    .hero {
+      background: var(--surface);
+      border-radius: var(--radius-lg);
+      padding: 36px 36px 32px;
+      box-shadow: var(--shadow-sm);
+      margin-bottom: 24px;
+      border: 1px solid var(--divider);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .hero::before {
+      content: "";
+      position: absolute;
+      top: -60px;
+      right: -60px;
+      width: 200px;
+      height: 200px;
+      background: radial-gradient(circle, rgba(123,108,240,.08) 0%, transparent 70%);
+      pointer-events: none;
+    }
+
+    .hero-eyebrow {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: .8px;
+      color: var(--accent);
+      margin-bottom: 10px;
+    }
+
+    .hero h1 {
+      font-size: clamp(22px, 5vw, 28px);
+      font-weight: 700;
+      color: var(--text-primary);
+      letter-spacing: -.5px;
+      line-height: 1.25;
+      margin-bottom: 12px;
+    }
+
+    .hero-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 16px;
+      align-items: center;
+    }
+
+    .hero-meta-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 13px;
+      color: var(--text-secondary);
+    }
+
+    .hero-meta-item .dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--ok);
+      flex-shrink: 0;
+    }
+
+    /* ── Table of Contents ───────────────────────────────────── */
+    .toc {
+      background: var(--surface);
+      border-radius: var(--radius-md);
+      padding: 20px 24px;
+      box-shadow: var(--shadow-sm);
+      margin-bottom: 24px;
+      border: 1px solid var(--divider);
+    }
+
+    .toc-label {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: .7px;
+      color: var(--text-tertiary);
+      margin-bottom: 12px;
+    }
+
+    .toc-list {
+      list-style: none;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 4px 16px;
+    }
+
+    @media (max-width: 520px) {
+      .toc-list { grid-template-columns: 1fr; }
+    }
+
+    .toc-list li a {
+      font-size: 13.5px;
+      color: var(--accent);
+      text-decoration: none;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 0;
+      transition: opacity .15s;
+    }
+
+    .toc-list li a:hover { opacity: .7; }
+
+    .toc-list li a::before {
+      content: "↓";
+      font-size: 10px;
+      opacity: .6;
+    }
+
+    /* ── Section cards ────────────────────────────────────────── */
+    .section-card {
+      background: var(--surface);
+      border-radius: var(--radius-lg);
+      padding: 28px 32px;
+      box-shadow: var(--shadow-sm);
+      margin-bottom: 16px;
+      border: 1px solid var(--divider);
+      transition: box-shadow .2s ease;
+    }
+
+    .section-card:hover {
+      box-shadow: var(--shadow-md);
+    }
+
+    @media (max-width: 600px) {
+      .section-card { padding: 22px 20px; }
+      .hero { padding: 24px 20px 22px; }
+    }
+
+    .section-number {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 26px;
+      height: 26px;
+      border-radius: 8px;
+      background: var(--accent-bg);
+      color: var(--accent);
+      font-size: 11px;
+      font-weight: 700;
+      margin-bottom: 12px;
+      flex-shrink: 0;
+    }
+
+    .section-card h2 {
+      font-size: 16px;
+      font-weight: 650;
+      color: var(--text-primary);
+      letter-spacing: -.2px;
+      margin-bottom: 14px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .section-card h2 .icon {
+      width: 32px;
+      height: 32px;
+      border-radius: 9px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 15px;
+      flex-shrink: 0;
+    }
+
+    .icon-purple { background: #EEEAFD; }
+    .icon-green  { background: #E8F7EE; }
+    .icon-amber  { background: #FDF3E3; }
+    .icon-coral  { background: #FDECEA; }
+    .icon-blue   { background: #E8F0FD; }
+    .icon-gray   { background: var(--surface-raised); }
+
+    .section-card p {
+      font-size: 14.5px;
+      color: var(--text-secondary);
+      line-height: 1.7;
+      margin-bottom: 12px;
+    }
+
+    .section-card p:last-child { margin-bottom: 0; }
+
+    /* ── Inline lists ─────────────────────────────────────────── */
+    .list {
+      list-style: none;
+      margin: 10px 0 14px;
+    }
+
+    .list li {
+      font-size: 14px;
+      color: var(--text-secondary);
+      padding: 7px 0 7px 22px;
+      position: relative;
+      border-bottom: 1px solid var(--divider);
+      line-height: 1.55;
+    }
+
+    .list li:last-child { border-bottom: none; }
+
+    .list li::before {
+      content: "·";
+      position: absolute;
+      left: 8px;
+      color: var(--accent);
+      font-size: 18px;
+      line-height: 1.3;
+    }
+
+    .list li strong {
+      color: var(--text-primary);
+      font-weight: 600;
+    }
+
+    /* ── Highlight box ────────────────────────────────────────── */
+    .highlight-box {
+      background: var(--accent-bg);
+      border-left: 3px solid var(--accent);
+      border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+      padding: 14px 16px;
+      margin: 14px 0;
+    }
+
+    .highlight-box p {
+      font-size: 13.5px;
+      color: var(--accent);
+      margin: 0 !important;
+      font-weight: 500;
+      line-height: 1.6;
+    }
+
+    .ok-box {
+      background: #E8F7EE;
+      border-left: 3px solid var(--ok);
+      border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+      padding: 14px 16px;
+      margin: 14px 0;
+    }
+
+    .ok-box p {
+      font-size: 13.5px;
+      color: #3C8A5E;
+      margin: 0 !important;
+      font-weight: 500;
+      line-height: 1.6;
+    }
+
+    /* ── Data table ───────────────────────────────────────────── */
+    .data-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 14px 0;
+      font-size: 13.5px;
+    }
+
+    .data-table th {
+      text-align: left;
+      padding: 10px 14px;
+      background: var(--surface-raised);
+      color: var(--text-secondary);
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: .5px;
+    }
+
+    .data-table th:first-child { border-radius: var(--radius-sm) 0 0 0; }
+    .data-table th:last-child  { border-radius: 0 var(--radius-sm) 0 0; }
+
+    .data-table td {
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--divider);
+      color: var(--text-secondary);
+      vertical-align: top;
+      line-height: 1.55;
+    }
+
+    .data-table td:first-child { color: var(--text-primary); font-weight: 500; }
+    .data-table tr:last-child td { border-bottom: none; }
+
+    /* ── Contact card ─────────────────────────────────────────── */
+    .contact-card {
+      background: linear-gradient(135deg, #9B8FF5 0%, #7B6CF0 100%);
+      border-radius: var(--radius-lg);
+      padding: 32px 36px;
+      margin-top: 24px;
+      position: relative;
+      overflow: hidden;
+      box-shadow: 0 8px 32px rgba(123,108,240,.28);
+    }
+
+    .contact-card::before {
+      content: "";
+      position: absolute;
+      top: -40px; right: -40px;
+      width: 160px; height: 160px;
+      border-radius: 50%;
+      background: rgba(255,255,255,.08);
+    }
+
+    .contact-card::after {
+      content: "";
+      position: absolute;
+      bottom: -50px; left: -20px;
+      width: 120px; height: 120px;
+      border-radius: 50%;
+      background: rgba(255,255,255,.05);
+    }
+
+    .contact-card h3 {
+      font-size: 18px;
+      font-weight: 700;
+      color: #fff;
+      letter-spacing: -.3px;
+      margin-bottom: 8px;
+      position: relative;
+    }
+
+    .contact-card p {
+      font-size: 14px;
+      color: rgba(255,255,255,.75);
+      margin-bottom: 20px;
+      position: relative;
+      line-height: 1.6;
+    }
+
+    .contact-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(255,255,255,.18);
+      border: 1px solid rgba(255,255,255,.25);
+      color: #fff;
+      font-size: 14px;
+      font-weight: 600;
+      padding: 10px 20px;
+      border-radius: 50px;
+      text-decoration: none;
+      transition: background .2s ease, transform .15s ease;
+      position: relative;
+      backdrop-filter: blur(8px);
+    }
+
+    .contact-link:hover {
+      background: rgba(255,255,255,.28);
+      transform: translateY(-1px);
+    }
+
+    .contact-link svg {
+      width: 15px;
+      height: 15px;
+      fill: #fff;
+    }
+
+    /* ── Footer ───────────────────────────────────────────────── */
+    footer {
+      background: var(--surface);
+      border-top: 1px solid var(--divider);
+      padding: 28px 24px;
+      text-align: center;
+    }
+
+    .footer-inner {
+      max-width: 760px;
+      margin: 0 auto;
+    }
+
+    .footer-logo {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+
+    .footer-logo-mark {
+      width: 22px; height: 22px;
+      border-radius: 6px;
+      background: linear-gradient(135deg, #9B8FF5, #7B6CF0);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .footer-logo-mark svg { width: 11px; height: 11px; fill: #fff; }
+
+    .footer-logo span {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--text-primary);
+    }
+
+    footer p {
+      font-size: 12.5px;
+      color: var(--text-tertiary);
+      line-height: 1.6;
+    }
+
+    footer a {
+      color: var(--accent);
+      text-decoration: none;
+    }
+
+    footer a:hover { text-decoration: underline; }
+
+    /* ── Divider ──────────────────────────────────────────────── */
+    .rule {
+      border: none;
+      border-top: 1px solid var(--divider);
+      margin: 6px 0 14px;
+    }
+
+    /* ── Responsive tweaks ────────────────────────────────────── */
+    @media (max-width: 480px) {
+      .contact-card { padding: 24px 20px; }
+      .header-badge { display: none; }
+    }
+  </style>
+</head>
+
+<body>
+
+<!-- ── Header ──────────────────────────────────────────────── -->
+<header>
+  <div class="header-inner">
+    <a class="logo" href="#">
+      <div class="logo-mark">
+        <!-- Lightning bolt icon matching Veloce speed theme -->
+        <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+          <path d="M13 2L4.5 13.5H11L10 22L20.5 10H14L13 2Z"/>
+        </svg>
+      </div>
+      <span class="logo-text">Veloce</span>
+    </a>
+    <span class="header-badge">Legal &amp; Privacy</span>
+  </div>
+</header>
+
+<!-- ── Tab bar ─────────────────────────────────────────────── -->
+<div class="tabs-wrap">
+  <div class="tabs">
+    <button class="tab-btn active" onclick="switchTab('privacy', this)">Privacy Policy</button>
+    <button class="tab-btn"        onclick="switchTab('terms', this)">Terms of Use</button>
+  </div>
+</div>
+
+<!-- ── Main ────────────────────────────────────────────────── -->
+<main>
+
+  <!-- ═══════════════════════════════════════════════════════
+       PRIVACY POLICY
+  ════════════════════════════════════════════════════════════ -->
+  <div id="privacy" class="panel active">
+
+    <div class="hero">
+      <p class="hero-eyebrow">Privacy Policy</p>
+      <h1>Your data, your control</h1>
+      <div class="hero-meta">
+        <span class="hero-meta-item">
+          <span class="dot"></span>
+          Effective: April 12, 2026
+        </span>
+        <span class="hero-meta-item">
+          <span class="dot" style="background:var(--accent)"></span>
+          App: Veloce for iOS
+        </span>
+      </div>
+    </div>
+
+    <!-- TOC -->
+    <div class="toc">
+      <p class="toc-label">Contents</p>
+      <ul class="toc-list">
+        <li><a href="#p1">Data We Collect</a></li>
+        <li><a href="#p2">How We Use Your Data</a></li>
+        <li><a href="#p3">AI &amp; Speech Processing</a></li>
+        <li><a href="#p4">Data Storage</a></li>
+        <li><a href="#p5">Third-Party Services</a></li>
+        <li><a href="#p6">Children's Privacy</a></li>
+        <li><a href="#p7">Your Rights</a></li>
+        <li><a href="#p8">Contact</a></li>
+      </ul>
+    </div>
+
+    <!-- 1 -->
+    <div class="section-card" id="p1">
+      <h2>
+        <span class="icon icon-purple">📋</span>
+        1. Data We Collect
+      </h2>
+      <p>Veloce is designed with a privacy-first mindset. The information we handle falls into two categories:</p>
+
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Type</th>
+            <th>Examples</th>
+            <th>Where It Lives</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Expense records</td>
+            <td>Title, amount, date, category</td>
+            <td>On-device only</td>
+          </tr>
+          <tr>
+            <td>Budget settings</td>
+            <td>Category budgets, spending goals</td>
+            <td>On-device only</td>
+          </tr>
+          <tr>
+            <td>App preferences</td>
+            <td>Currency, language, panel state</td>
+            <td>On-device (UserDefaults)</td>
+          </tr>
+          <tr>
+            <td>AI query text</td>
+            <td>Natural-language expense input</td>
+            <td>Sent to OpenAI API, not stored</td>
+          </tr>
+          <tr>
+            <td>Voice audio</td>
+            <td>Spoken expense entries</td>
+            <td>Processed on-device via Apple Speech</td>
+          </tr>
+          <tr>
+            <td>Purchase receipt</td>
+            <td>StoreKit transaction tokens</td>
+            <td>Apple servers</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="ok-box">
+        <p>✓ We never collect names, email addresses, contacts, location, or device identifiers for tracking purposes.</p>
+      </div>
+    </div>
+
+    <!-- 2 -->
+    <div class="section-card" id="p2">
+      <h2>
+        <span class="icon icon-green">⚙️</span>
+        2. How We Use Your Data
+      </h2>
+      <p>Data collected is used exclusively to provide and improve the Veloce experience:</p>
+      <ul class="list">
+        <li><strong>Expense tracking</strong> — store, display, and summarise your spending across categories and time periods.</li>
+        <li><strong>Budget management</strong> — calculate remaining budgets, progress ratios, and over-budget alerts.</li>
+        <li><strong>AI expense parsing</strong> — convert natural-language text (e.g. "lunch 80k") into structured expense entries via the OpenAI API.</li>
+        <li><strong>Subscription verification</strong> — validate your Pro entitlement through Apple's StoreKit to unlock premium features.</li>
+        <li><strong>Usage limits</strong> — track the number of AI messages used today (stored locally) to enforce the free-tier limit of 3 messages per day.</li>
+      </ul>
+      <p>We do <strong>not</strong> use your data for advertising, profiling, or any purpose unrelated to the core app functionality.</p>
+    </div>
+
+    <!-- 3 -->
+    <div class="section-card" id="p3">
+      <h2>
+        <span class="icon icon-purple">🤖</span>
+        3. AI &amp; Speech Processing
+      </h2>
+      <p><strong>AI (OpenAI API)</strong></p>
+      <p>When you use the AI assistant or natural-language input, the text of your message is sent to OpenAI's API to parse expense details. This data is transmitted over HTTPS and is subject to <a href="https://openai.com/policies/privacy-policy" style="color:var(--accent)">OpenAI's Privacy Policy</a>. We do not instruct OpenAI to train on your inputs; requests are sent with the data-minimisation parameters available under their API terms.</p>
+
+      <hr class="rule">
+
+      <p><strong>Speech Recognition (Apple)</strong></p>
+      <p>Voice input is processed using Apple's on-device Speech Recognition framework (SFSpeechRecognizer). Audio is transcribed locally on your device before any text is handled. We never record, buffer, or upload raw audio to our own servers.</p>
+
+      <div class="highlight-box">
+        <p>The AI receives only the expense text you type or speak — never your stored expense history, budget amounts, or personal details.</p>
+      </div>
+    </div>
+
+    <!-- 4 -->
+    <div class="section-card" id="p4">
+      <h2>
+        <span class="icon icon-blue">💾</span>
+        4. Data Storage &amp; Security
+      </h2>
+      <p>All expense records, categories, and budgets are stored as JSON files inside your iPhone's sandboxed Documents directory (<code style="font-size:12.5px;background:var(--surface-raised);padding:2px 6px;border-radius:5px">veloce_categories.json</code>, <code style="font-size:12.5px;background:var(--surface-raised);padding:2px 6px;border-radius:5px">veloce_expenses.json</code>). These files are:</p>
+      <ul class="list">
+        <li><strong>Private</strong> — inaccessible to other apps due to iOS sandboxing.</li>
+        <li><strong>Included in iCloud Backup</strong> — if you have iCloud Backup enabled, these files may be included in your personal backup, which is encrypted and controlled by your Apple ID.</li>
+        <li><strong>Not synced to our servers</strong> — Veloce has no backend or cloud database of its own.</li>
+      </ul>
+      <p>Write operations are dispatched to a background serial queue to protect data integrity. We strongly recommend enabling a device passcode and Face ID to protect your financial data.</p>
+    </div>
+
+    <!-- 5 -->
+    <div class="section-card" id="p5">
+      <h2>
+        <span class="icon icon-amber">🔗</span>
+        5. Third-Party Services
+      </h2>
+      <p>Veloce integrates with the following third-party services. Each operates under its own privacy policy:</p>
+      <ul class="list">
+        <li><strong>OpenAI API</strong> — AI expense parsing. Text queries only. <a href="https://openai.com/policies/privacy-policy" style="color:var(--accent)">openai.com/policies/privacy-policy</a></li>
+        <li><strong>Apple StoreKit 2</strong> — in-app purchase validation for Pro subscriptions. Transaction data is managed by Apple. <a href="https://www.apple.com/legal/privacy/" style="color:var(--accent)">apple.com/legal/privacy</a></li>
+        <li><strong>Apple Speech Framework</strong> — on-device speech-to-text for voice input.</li>
+      </ul>
+      <p>We do not use analytics SDKs, crash-reporting services, advertising networks, or social login providers.</p>
+    </div>
+
+    <!-- 6 -->
+    <div class="section-card" id="p6">
+      <h2>
+        <span class="icon icon-coral">🧒</span>
+        6. Children's Privacy
+      </h2>
+      <p>Veloce is not directed to children under the age of 13 (or the applicable age of digital consent in your jurisdiction). We do not knowingly collect personal information from children. If you believe a child has provided information through the app, please contact us immediately at <a href="mailto:Manhcuong531@gmail.com" style="color:var(--accent)">Manhcuong531@gmail.com</a> and we will delete it promptly.</p>
+    </div>
+
+    <!-- 7 -->
+    <div class="section-card" id="p7">
+      <h2>
+        <span class="icon icon-green">⚖️</span>
+        7. Your Rights
+      </h2>
+      <p>Because all your financial data lives exclusively on your device, you have full and direct control:</p>
+      <ul class="list">
+        <li><strong>Access</strong> — open Veloce to view all your data at any time.</li>
+        <li><strong>Delete</strong> — deleting a category or expense removes it instantly and permanently from your device.</li>
+        <li><strong>Export</strong> — your data files are accessible via the Files app if you enable iCloud Drive for Veloce.</li>
+        <li><strong>Full erasure</strong> — uninstalling Veloce permanently deletes all local data.</li>
+      </ul>
+      <p>For any other privacy request or concern, contact us at <a href="mailto:Manhcuong531@gmail.com" style="color:var(--accent)">Manhcuong531@gmail.com</a>. We aim to respond within 5 business days.</p>
+    </div>
+
+    <!-- 8 -->
+    <div class="section-card" id="p8">
+      <h2>
+        <span class="icon icon-purple">✉️</span>
+        8. Changes to This Policy
+      </h2>
+      <p>We may update this Privacy Policy from time to time. When we make material changes, we will update the "Effective" date above. Continued use of Veloce after changes become effective constitutes acceptance of the revised policy. We encourage you to review this page periodically.</p>
+    </div>
+
+    <!-- Contact -->
+    <div class="contact-card">
+      <h3>Questions about privacy?</h3>
+      <p>We're committed to transparency. If you have any questions, requests, or concerns about how Veloce handles your data, reach out directly.</p>
+      <a class="contact-link" href="mailto:Manhcuong531@gmail.com">
+        <svg viewBox="0 0 24 24"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg>
+        Manhcuong531@gmail.com
+      </a>
+    </div>
+
+  </div><!-- /privacy -->
+
+
+  <!-- ═══════════════════════════════════════════════════════
+       TERMS OF USE
+  ════════════════════════════════════════════════════════════ -->
+  <div id="terms" class="panel">
+
+    <div class="hero">
+      <p class="hero-eyebrow">Terms of Use</p>
+      <h1>Simple, fair terms for everyone</h1>
+      <div class="hero-meta">
+        <span class="hero-meta-item">
+          <span class="dot"></span>
+          Effective: April 12, 2026
+        </span>
+        <span class="hero-meta-item">
+          <span class="dot" style="background:var(--accent)"></span>
+          App: Veloce for iOS
+        </span>
+      </div>
+    </div>
+
+    <!-- TOC -->
+    <div class="toc">
+      <p class="toc-label">Contents</p>
+      <ul class="toc-list">
+        <li><a href="#t1">Acceptance</a></li>
+        <li><a href="#t2">App Description</a></li>
+        <li><a href="#t3">Free vs. Pro</a></li>
+        <li><a href="#t4">Subscriptions &amp; Billing</a></li>
+        <li><a href="#t5">Acceptable Use</a></li>
+        <li><a href="#t6">Intellectual Property</a></li>
+        <li><a href="#t7">Disclaimers</a></li>
+        <li><a href="#t8">Limitation of Liability</a></li>
+        <li><a href="#t9">Governing Law</a></li>
+        <li><a href="#t10">Contact</a></li>
+      </ul>
+    </div>
+
+    <!-- 1 -->
+    <div class="section-card" id="t1">
+      <h2>
+        <span class="icon icon-purple">📝</span>
+        1. Acceptance of Terms
+      </h2>
+      <p>By downloading, installing, or using Veloce ("the App"), you agree to be bound by these Terms of Use ("Terms"). If you do not agree, please do not use the App. These Terms constitute a legally binding agreement between you and the developer of Veloce ("we", "us", or "our").</p>
+      <p>These Terms should be read alongside our Privacy Policy, which is incorporated here by reference.</p>
+    </div>
+
+    <!-- 2 -->
+    <div class="section-card" id="t2">
+      <h2>
+        <span class="icon icon-blue">⚡</span>
+        2. App Description
+      </h2>
+      <p>Veloce is a personal finance tracking application for iOS that allows users to:</p>
+      <ul class="list">
+        <li><strong>Log expenses</strong> using natural-language text input, voice dictation, or manual entry.</li>
+        <li><strong>Organise spending</strong> into colour-coded categories with individual budget limits.</li>
+        <li><strong>Visualise budgets</strong> through animated column charts and a monthly progress overview.</li>
+        <li><strong>Use AI assistance</strong> to parse expense descriptions and receive spending insights (Pro feature).</li>
+        <li><strong>Set and track</strong> monthly income and saving goals.</li>
+      </ul>
+      <p>Veloce is a personal productivity tool. It is <strong>not</strong> a licensed financial advisory service, bank, or investment platform.</p>
+    </div>
+
+    <!-- 3 -->
+    <div class="section-card" id="t3">
+      <h2>
+        <span class="icon icon-amber">🆓</span>
+        3. Free vs. Pro Access
+      </h2>
+      <p>Veloce offers two tiers of access:</p>
+
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Feature</th>
+            <th>Free</th>
+            <th>Pro</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Expense logging</td>
+            <td>✓ Unlimited</td>
+            <td>✓ Unlimited</td>
+          </tr>
+          <tr>
+            <td>Budget categories</td>
+            <td>✓ Unlimited</td>
+            <td>✓ Unlimited</td>
+          </tr>
+          <tr>
+            <td>AI expense parsing</td>
+            <td>3 messages / day</td>
+            <td>✓ Unlimited</td>
+          </tr>
+          <tr>
+            <td>AI financial insights</td>
+            <td>—</td>
+            <td>✓ Full access</td>
+          </tr>
+          <tr>
+            <td>Voice input</td>
+            <td>✓</td>
+            <td>✓</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="highlight-box">
+        <p>The free tier is permanent — no time limit, no expiry. Pro features are unlocked via an in-app purchase.</p>
+      </div>
+    </div>
+
+    <!-- 4 -->
+    <div class="section-card" id="t4">
+      <h2>
+        <span class="icon icon-green">💳</span>
+        4. Subscriptions &amp; Billing
+      </h2>
+      <p>Pro access is available through two purchase options processed by Apple's App Store:</p>
+      <ul class="list">
+        <li><strong>Yearly subscription</strong> (<code style="font-size:12px;background:var(--surface-raised);padding:2px 6px;border-radius:4px">com.veloce.yearly</code>) — billed annually. Auto-renews unless cancelled at least 24 hours before the renewal date.</li>
+        <li><strong>Lifetime purchase</strong> (<code style="font-size:12px;background:var(--surface-raised);padding:2px 6px;border-radius:4px">com.veloce.lifetime</code>) — one-time payment for permanent Pro access.</li>
+      </ul>
+      <p>All billing, payment processing, refunds, and subscription management are handled exclusively by Apple. To manage or cancel a subscription, visit <strong>Settings → [Your Name] → Subscriptions</strong> on your device. We do not have access to your payment details.</p>
+      <p>Prices are displayed in the App Store in your local currency and may vary by region. We reserve the right to change pricing with reasonable notice.</p>
+    </div>
+
+    <!-- 5 -->
+    <div class="section-card" id="t5">
+      <h2>
+        <span class="icon icon-coral">🚫</span>
+        5. Acceptable Use
+      </h2>
+      <p>You agree not to use Veloce in any way that:</p>
+      <ul class="list">
+        <li>Violates any applicable local, national, or international law or regulation.</li>
+        <li>Attempts to reverse-engineer, decompile, or extract the source code of the App.</li>
+        <li>Uses automated scripts or bots to interact with the App or its connected APIs.</li>
+        <li>Circumvents the AI usage limits or subscription gating through technical means.</li>
+        <li>Submits harmful, abusive, or illegal content through the AI assistant.</li>
+        <li>Interferes with or disrupts the App's functionality or connected third-party services.</li>
+      </ul>
+      <p>We reserve the right to restrict access if these terms are violated.</p>
+    </div>
+
+    <!-- 6 -->
+    <div class="section-card" id="t6">
+      <h2>
+        <span class="icon icon-purple">©️</span>
+        6. Intellectual Property
+      </h2>
+      <p>All content, design elements, code, graphics, animations, and brand assets within Veloce — including the app name, logo, and UI — are the exclusive intellectual property of the developer and are protected by applicable copyright and trademark law.</p>
+      <p>You are granted a limited, non-exclusive, non-transferable, revocable licence to use the App on your personal Apple devices, solely for your own personal, non-commercial expense tracking purposes.</p>
+      <p>Your expense data (the records you enter) remains your own. We assert no ownership over the financial data you create within the App.</p>
+    </div>
+
+    <!-- 7 -->
+    <div class="section-card" id="t7">
+      <h2>
+        <span class="icon icon-amber">⚠️</span>
+        7. Disclaimers
+      </h2>
+      <div class="highlight-box">
+        <p>Veloce is provided "as is" and "as available" without warranties of any kind, express or implied.</p>
+      </div>
+      <ul class="list">
+        <li><strong>Not financial advice</strong> — Veloce is a tracking tool only. Nothing in the App constitutes professional financial, tax, investment, or legal advice. Always consult a qualified professional for financial decisions.</li>
+        <li><strong>AI accuracy</strong> — AI-generated expense parsing and insights may contain errors. You are responsible for verifying all entries before relying on them.</li>
+        <li><strong>Availability</strong> — we do not guarantee that the App will be available without interruption, or that third-party services (OpenAI API) will remain accessible.</li>
+        <li><strong>Data accuracy</strong> — the App reflects only the data you enter. We are not responsible for errors arising from incorrect input.</li>
+      </ul>
+    </div>
+
+    <!-- 8 -->
+    <div class="section-card" id="t8">
+      <h2>
+        <span class="icon icon-coral">🛡️</span>
+        8. Limitation of Liability
+      </h2>
+      <p>To the maximum extent permitted by applicable law, we shall not be liable for any indirect, incidental, special, consequential, or punitive damages, including but not limited to:</p>
+      <ul class="list">
+        <li>Loss of data or financial loss arising from App errors or data deletion.</li>
+        <li>Decisions made based on AI-generated insights or budget summaries.</li>
+        <li>Service interruptions caused by third-party providers (OpenAI, Apple).</li>
+        <li>Unauthorised access to your device data by third parties.</li>
+      </ul>
+      <p>Our total aggregate liability to you for any claims arising out of these Terms shall not exceed the amount you paid for Pro access in the 12 months preceding the claim.</p>
+    </div>
+
+    <!-- 9 -->
+    <div class="section-card" id="t9">
+      <h2>
+        <span class="icon icon-gray">🌏</span>
+        9. Governing Law &amp; Disputes
+      </h2>
+      <p>These Terms are governed by and construed in accordance with the laws of Vietnam, without regard to its conflict of law provisions. Any disputes arising out of or relating to these Terms or the App shall first be attempted to be resolved through good-faith negotiation.</p>
+      <p>If you are an App Store user, your use of Veloce is also subject to Apple's standard end-user licence agreement (EULA) available at <a href="https://www.apple.com/legal/internet-services/itunes/dev/stdeula/" style="color:var(--accent)">apple.com/legal/…/stdeula</a>.</p>
+    </div>
+
+    <!-- 10 -->
+    <div class="section-card" id="t10">
+      <h2>
+        <span class="icon icon-purple">📬</span>
+        10. Changes &amp; Contact
+      </h2>
+      <p>We may revise these Terms at any time. Continued use of the App after changes take effect constitutes your acceptance of the revised Terms. We will update the "Effective" date at the top of this page when changes are made.</p>
+      <p>For questions about these Terms, partnership enquiries, or feature requests, please contact:</p>
+    </div>
+
+    <!-- Contact -->
+    <div class="contact-card">
+      <h3>Get in touch</h3>
+      <p>Have a question about billing, features, or these Terms? We read every message and aim to respond within 5 business days.</p>
+      <a class="contact-link" href="mailto:Manhcuong531@gmail.com">
+        <svg viewBox="0 0 24 24"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg>
+        Manhcuong531@gmail.com
+      </a>
+    </div>
+
+  </div><!-- /terms -->
+
+</main>
+
+<!-- ── Footer ───────────────────────────────────────────────── -->
+<footer>
+  <div class="footer-inner">
+    <div class="footer-logo">
+      <div class="footer-logo-mark">
+        <svg viewBox="0 0 24 24"><path d="M13 2L4.5 13.5H11L10 22L20.5 10H14L13 2Z"/></svg>
+      </div>
+      <span>Veloce</span>
+    </div>
+    <p>
+      &copy; 2026 Veloce. All rights reserved.&nbsp;&nbsp;·&nbsp;&nbsp;
+      <a href="mailto:Manhcuong531@gmail.com">Manhcuong531@gmail.com</a>
+    </p>
+  </div>
+</footer>
+
+<!-- ── Script ───────────────────────────────────────────────── -->
+<script>
+  function switchTab(id, btn) {
+    // Hide all panels
+    document.querySelectorAll('.panel').forEach(function(p) {
+      p.classList.remove('active');
+    });
+    // Deactivate all tabs
+    document.querySelectorAll('.tab-btn').forEach(function(b) {
+      b.classList.remove('active');
+    });
+    // Activate selected
+    document.getElementById(id).classList.add('active');
+    btn.classList.add('active');
+    // Scroll to top of content
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+</script>
+
+</body>
+</html>
