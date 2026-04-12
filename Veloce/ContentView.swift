@@ -194,48 +194,159 @@ private struct ColumnsCard: View {
     let onSwipeUp:    (Category) -> Void
     let onEditGroups: () -> Void
 
+    // Edit-budget mode state
+    @State private var isEditingBudget:  Bool   = false
+    @State private var activeCategoryId: UUID?  = nil
+    @State private var fixedTotalBudget: Double = 0   // total frozen on entry
+
+    private var remainingBudget: Double {
+        fixedTotalBudget - vm.totalBudget
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            HStack(spacing: 8) {
-                Text("Spending")
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(VeloceTheme.textPrimary)
-                Spacer()
-                heightToggle
-                editGroupsButton
+            // ── Header ───────────────────────────────────────────
+            if isEditingBudget {
+                editHeader
+            } else {
+                normalHeader
             }
 
+            // ── Hint text ────────────────────────────────────────
+            if isEditingBudget {
+                HStack(spacing: 5) {
+                    Image(systemName: "hand.draw")
+                        .font(.system(size: 11))
+                    Text("Drag bars to adjust your budget")
+                        .font(.system(size: 12))
+                }
+                .foregroundStyle(VeloceTheme.textSecondary)
+                .padding(.horizontal, 2)
+                .transition(.move(edge: .top).combined(with: .opacity))
+            }
+
+            // ── Columns ──────────────────────────────────────────
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(alignment: .bottom, spacing: 14) {
-                    ForEach(vm.visibleCategories) { cat in
-                        CategoryColumnView(
-                            category:      cat,
-                            barRatio:      vm.barRatio(for: cat),
-                            categoryColor: vm.categoryColor(for: cat),
-                            statusColor:   vm.statusColor(for: cat),
-                            isHighlighted: vm.highlightedCategoryId == cat.id,
-                            onTap:         { onTap(cat) },
-                            onLongPress:   { onLongPress(cat) },
-                            onSwipeUp:     { onSwipeUp(cat) }
-                        )
-                        .equatable()
+                    if isEditingBudget {
+                        ForEach(vm.visibleCategories) { cat in
+                            BudgetEditColumnView(
+                                category:      cat,
+                                totalBudget:   fixedTotalBudget,
+                                categoryColor: vm.categoryColor(for: cat),
+                                isActive:      activeCategoryId == cat.id,
+                                isAnyActive:   activeCategoryId != nil,
+                                onBudgetChange: { newBudget in
+                                    applyBudget(newBudget, for: cat)
+                                },
+                                onDragStart: {
+                                    withAnimation(.spring(response: 0.28)) {
+                                        activeCategoryId = cat.id
+                                    }
+                                },
+                                onDragEnd: {
+                                    withAnimation(.spring(response: 0.35)) {
+                                        activeCategoryId = nil
+                                    }
+                                }
+                            )
+                        }
+                    } else {
+                        ForEach(vm.visibleCategories) { cat in
+                            CategoryColumnView(
+                                category:      cat,
+                                barRatio:      vm.barRatio(for: cat),
+                                categoryColor: vm.categoryColor(for: cat),
+                                statusColor:   vm.statusColor(for: cat),
+                                isHighlighted: vm.highlightedCategoryId == cat.id,
+                                onTap:         { onTap(cat) },
+                                onLongPress:   { onLongPress(cat) },
+                                onSwipeUp:     { onSwipeUp(cat) }
+                            )
+                            .equatable()
+                        }
                     }
                 }
                 .padding(.horizontal, 2)
+                // Extra top padding in edit mode so the bubble (inside barStack) has
+                // visual breathing room near the card's top edge.
+                .padding(.top, isEditingBudget ? 10 : 0)
                 .padding(.bottom, 4)
             }
         }
         .veloceCard(radius: 22, padding: 20)
+        .animation(.spring(response: 0.38, dampingFraction: 0.82), value: isEditingBudget)
     }
 
-    private var heightToggle: some View {
+    // MARK: - Headers
+
+    private var normalHeader: some View {
+        HStack(spacing: 8) {
+            Text("Spending")
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(VeloceTheme.textPrimary)
+            Spacer()
+            editBudgetButton
+            editGroupsButton
+        }
+    }
+
+    private var editHeader: some View {
+        HStack(alignment: .center, spacing: 8) {
+            VStack(alignment: .leading, spacing: 3) {
+                Text("Edit Budget")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(VeloceTheme.textPrimary)
+
+                // Remaining pool – turns red when over-allocated
+                HStack(spacing: 4) {
+                    Circle()
+                        .fill(remainingBudget < 0 ? VeloceTheme.over : VeloceTheme.ok)
+                        .frame(width: 5, height: 5)
+                    Text(remainingBudget < 0
+                         ? "\((-remainingBudget).toCompactCurrency()) over"
+                         : "\(remainingBudget.toCompactCurrency()) remaining")
+                        .font(.system(size: 12, weight: .medium, design: .rounded))
+                        .foregroundStyle(remainingBudget < 0
+                                         ? VeloceTheme.over
+                                         : VeloceTheme.textSecondary)
+                        .contentTransition(.numericText())
+                        .animation(.spring(response: 0.25), value: remainingBudget)
+                }
+            }
+
+            Spacer()
+
+            // Done button
+            Button {
+                withAnimation(.spring(response: 0.38, dampingFraction: 0.80)) {
+                    isEditingBudget  = false
+                    activeCategoryId = nil
+                }
+            } label: {
+                Text("Done")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(VeloceTheme.accent)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 7)
+                    .background(VeloceTheme.accentBg, in: Capsule())
+            }
+        }
+    }
+
+    // MARK: - Edit Budget button (replaces the old Absolute/Relative toggle)
+
+    private var editBudgetButton: some View {
         Button {
-            withAnimation(.spring(response: 0.3)) { vm.isHeightRelative.toggle() }
+            fixedTotalBudget = vm.totalBudget   // freeze total before entering
+            withAnimation(.spring(response: 0.38, dampingFraction: 0.80)) {
+                isEditingBudget = true
+            }
         } label: {
             HStack(spacing: 4) {
-                Image(systemName: vm.isHeightRelative ? "chart.bar.fill" : "chart.bar")
+                Image(systemName: "slider.vertical.3")
                     .font(.system(size: 11))
-                Text(vm.isHeightRelative ? "Relative" : "Absolute")
+                Text("Edit Budget")
                     .font(.system(size: 11, weight: .medium))
             }
             .foregroundStyle(VeloceTheme.accent)
@@ -259,6 +370,26 @@ private struct ColumnsCard: View {
             .background(VeloceTheme.surfaceRaised, in: Capsule())
             .overlay(Capsule().strokeBorder(VeloceTheme.divider, lineWidth: 1))
         }
+    }
+
+    // MARK: - Budget constraint logic
+
+    /// Applies a new budget for one category, clamped so total never exceeds fixedTotalBudget.
+    private func applyBudget(_ newBudget: Double, for category: Category) {
+        // Sum of every other category's budget
+        let othersTotal = vm.categories
+            .filter { $0.id != category.id }
+            .reduce(0) { $0 + $1.budget }
+
+        let maxAllowed = max(0, fixedTotalBudget - othersTotal)
+        let clamped    = min(newBudget, maxAllowed)
+
+        // Warn with haptic when hitting the wall
+        if newBudget > maxAllowed {
+            UINotificationFeedbackGenerator().notificationOccurred(.warning)
+        }
+
+        vm.updateBudget(categoryId: category.id, newBudget: clamped)
     }
 }
 

@@ -23,7 +23,7 @@ struct EditGroupsSheet: View {
                         }
                         .onMove { vm.reorderCategories(from: $0, to: $1) }
                     } header: {
-                        Text("Drag to reorder  ·  tap ✏️ to edit limit & color")
+                        Text("Drag to reorder  ·  tap ✏️ to edit limit, color & icon")
                             .font(.system(size: 11))
                             .foregroundStyle(VeloceTheme.textTertiary)
                             .textCase(nil)
@@ -122,11 +122,14 @@ private struct GroupEditSheet: View {
     let category: Category
 
     @State private var selectedColorHex: String
-    @State private var budgetText: String
+    @State private var selectedIcon:     String
+    @State private var budgetText:       String
+    @State private var showIconPicker    = false
 
     init(category: Category) {
-        self.category = category
+        self.category     = category
         _selectedColorHex = State(initialValue: category.colorHex.uppercased())
+        _selectedIcon     = State(initialValue: category.icon)
         _budgetText       = State(initialValue: "\(Int(category.budget))")
     }
 
@@ -185,29 +188,61 @@ private struct GroupEditSheet: View {
         .presentationDragIndicator(.visible)
         .presentationBackground(VeloceTheme.bg)
         .preferredColorScheme(.light)
+        .sheet(isPresented: $showIconPicker) {
+            IconPickerSheet(selectedIcon: $selectedIcon)
+        }
     }
 
-    // MARK: - Header
+    // MARK: - Header (icon is tappable → opens icon picker)
 
     private var headerCard: some View {
         HStack(spacing: 16) {
-            ZStack {
-                Circle()
-                    .fill(Color(hex: selectedColorHex).opacity(0.14))
-                    .frame(width: 60, height: 60)
-                Image(systemName: category.icon)
-                    .font(.system(size: 24, weight: .medium))
-                    .foregroundStyle(Color(hex: selectedColorHex))
+            // Tappable icon badge
+            Button {
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                showIconPicker = true
+            } label: {
+                ZStack(alignment: .bottomTrailing) {
+                    // Circle background
+                    Circle()
+                        .fill(Color(hex: selectedColorHex).opacity(0.14))
+                        .frame(width: 64, height: 64)
+
+                    // Symbol
+                    Image(systemName: selectedIcon)
+                        .font(.system(size: 26, weight: .medium))
+                        .foregroundStyle(Color(hex: selectedColorHex))
+                        .frame(width: 64, height: 64)
+
+                    // Small pencil badge
+                    ZStack {
+                        Circle()
+                            .fill(VeloceTheme.accent)
+                            .frame(width: 20, height: 20)
+                        Image(systemName: "pencil")
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundStyle(.white)
+                    }
+                    .offset(x: 2, y: 2)
+                }
             }
-            .animation(.spring(response: 0.3), value: selectedColorHex)
+            .buttonStyle(.plain)
+            .animation(.spring(response: 0.28), value: selectedColorHex)
+            .animation(.spring(response: 0.28), value: selectedIcon)
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(category.name)
                     .font(.system(size: 22, weight: .bold))
                     .foregroundStyle(VeloceTheme.textPrimary)
-                Text("Set a spending limit and pick a color")
-                    .font(.system(size: 13))
-                    .foregroundStyle(VeloceTheme.textSecondary)
+
+                // Hint nudges user to tap the icon
+                HStack(spacing: 4) {
+                    Image(systemName: "hand.tap.fill")
+                        .font(.system(size: 10))
+                    Text("Tap icon to customize")
+                        .font(.system(size: 12))
+                }
+                .foregroundStyle(VeloceTheme.accent.opacity(0.8))
             }
             Spacer()
         }
@@ -222,7 +257,6 @@ private struct GroupEditSheet: View {
                 .font(.system(size: 13, weight: .semibold))
                 .foregroundStyle(VeloceTheme.textSecondary)
 
-            // Preset chips grid (4 per row)
             LazyVGrid(
                 columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 4),
                 spacing: 8
@@ -239,9 +273,7 @@ private struct GroupEditSheet: View {
                             .padding(.vertical, 11)
                             .background(
                                 RoundedRectangle(cornerRadius: 11, style: .continuous)
-                                    .fill(isSelected
-                                          ? VeloceTheme.accent
-                                          : VeloceTheme.surfaceRaised)
+                                    .fill(isSelected ? VeloceTheme.accent : VeloceTheme.surfaceRaised)
                                     .overlay(
                                         RoundedRectangle(cornerRadius: 11, style: .continuous)
                                             .strokeBorder(
@@ -256,7 +288,6 @@ private struct GroupEditSheet: View {
                 }
             }
 
-            // Custom amount input
             HStack(spacing: 10) {
                 Image(systemName: "pencil")
                     .font(.system(size: 13))
@@ -312,11 +343,9 @@ private struct GroupEditSheet: View {
                         selectedColorHex = hex.uppercased()
                     } label: {
                         ZStack {
-                            Circle()
-                                .fill(Color(hex: hex))
+                            Circle().fill(Color(hex: hex))
                             if isSelected {
-                                Circle()
-                                    .strokeBorder(.white, lineWidth: 3)
+                                Circle().strokeBorder(.white, lineWidth: 3)
                                 Image(systemName: "checkmark")
                                     .font(.system(size: 11, weight: .bold))
                                     .foregroundStyle(.white)
@@ -352,9 +381,10 @@ private struct GroupEditSheet: View {
 
     private func save() {
         guard isValid, let budget = parsedBudget else { return }
-        var updated        = category
-        updated.budget     = budget
-        updated.colorHex   = selectedColorHex
+        var updated      = category
+        updated.budget   = budget
+        updated.colorHex = selectedColorHex
+        updated.icon     = selectedIcon          // ← persist icon change
         vm.updateCategory(updated)
         dismiss()
     }

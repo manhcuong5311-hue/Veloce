@@ -175,6 +175,12 @@ final class ExpenseViewModel: ObservableObject {
         }
     }
 
+    /// No-animation update used during live drag so the bar height tracks the finger without lag.
+    func updateBudgetLive(categoryId: UUID, newBudget: Double) {
+        guard let i = categories.firstIndex(where: { $0.id == categoryId }) else { return }
+        categories[i].budget = newBudget
+    }
+
     func updateCategory(_ updated: Category) {
         guard let i = categories.firstIndex(where: { $0.id == updated.id }) else { return }
         withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
