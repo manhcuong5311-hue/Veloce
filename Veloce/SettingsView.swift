@@ -772,7 +772,7 @@ struct FAQView: View {
         ),
         (
             "How do I edit or delete a transaction?",
-            "Tap any row in the list to open the edit screen. Swipe left to reveal Edit and Delete buttons. Long-press for a quick-action menu."
+            "Tap any row in the list to open the edit screen. Long-press (hold) a row to reveal a quick-action menu with Edit and Delete options."
         ),
         (
             "How do I set or change a budget?",

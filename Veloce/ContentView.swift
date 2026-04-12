@@ -679,28 +679,145 @@ private struct ExpenseTimeline: View {
     @EnvironmentObject var vm: ExpenseViewModel
     let onEdit: (Expense) -> Void
 
+    @State private var searchText        = ""
+    @State private var filterCategoryId: UUID? = nil
+
+    private var filteredGroups: [ExpenseGroup] {
+        let query = searchText.trimmingCharacters(in: .whitespaces).lowercased()
+        return vm.expenseGroups.compactMap { group in
+            let filtered = group.items.filter { expense in
+                let matchesSearch = query.isEmpty
+                    || expense.title.lowercased().contains(query)
+                    || expense.note.lowercased().contains(query)
+                let matchesCategory = filterCategoryId == nil
+                    || expense.categoryId == filterCategoryId
+                return matchesSearch && matchesCategory
+            }
+            return filtered.isEmpty ? nil
+                : ExpenseGroup(id: group.id, title: group.title, items: filtered)
+        }
+    }
+
     var body: some View {
-        LazyVStack(spacing: 20, pinnedViews: []) {
-            if vm.expenseGroups.isEmpty {
-                emptyState
-            } else {
-                ForEach(vm.expenseGroups) { group in
-                    DaySection(group: group, onEdit: onEdit)
-                        .environmentObject(vm)
+        VStack(spacing: 14) {
+            if !vm.expenses.isEmpty {
+                searchBar
+                categoryFilterChips
+            }
+            LazyVStack(spacing: 20, pinnedViews: []) {
+                if filteredGroups.isEmpty {
+                    emptyState
+                } else {
+                    ForEach(filteredGroups) { group in
+                        DaySection(group: group, onEdit: onEdit)
+                            .environmentObject(vm)
+                    }
                 }
             }
         }
     }
 
+    // MARK: - Search bar
+
+    private var searchBar: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "magnifyingglass")
+                .font(.system(size: 14, weight: .medium))
+                .foregroundStyle(searchText.isEmpty ? VeloceTheme.textTertiary : VeloceTheme.accent)
+            TextField("Search expenses…", text: $searchText)
+                .font(.system(size: 14))
+                .foregroundStyle(VeloceTheme.textPrimary)
+                .tint(VeloceTheme.accent)
+                .autocorrectionDisabled()
+            if !searchText.isEmpty {
+                Button { searchText = "" } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 14))
+                        .foregroundStyle(VeloceTheme.textTertiary)
+                }
+                .transition(.scale.combined(with: .opacity))
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background(VeloceTheme.surface, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .shadow(color: .black.opacity(0.04), radius: 4, x: 0, y: 1)
+        .animation(.easeInOut(duration: 0.15), value: searchText.isEmpty)
+    }
+
+    // MARK: - Category filter chips
+
+    private var categoryFilterChips: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                // All chip
+                Button {
+                    withAnimation(.spring(response: 0.25)) { filterCategoryId = nil }
+                } label: {
+                    Text("All")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(filterCategoryId == nil ? .white : VeloceTheme.textSecondary)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(
+                            filterCategoryId == nil ? VeloceTheme.accent : VeloceTheme.surface,
+                            in: Capsule()
+                        )
+                        .overlay(Capsule().strokeBorder(
+                            filterCategoryId == nil ? Color.clear : VeloceTheme.divider,
+                            lineWidth: 1
+                        ))
+                }
+
+                // Only categories that have at least one recorded expense
+                ForEach(vm.categories.filter { cat in
+                    vm.expenses.contains { $0.categoryId == cat.id }
+                }) { cat in
+                    let col        = Color(hex: cat.colorHex)
+                    let isSelected = filterCategoryId == cat.id
+                    Button {
+                        withAnimation(.spring(response: 0.25)) {
+                            filterCategoryId = isSelected ? nil : cat.id
+                        }
+                    } label: {
+                        HStack(spacing: 5) {
+                            Image(systemName: cat.icon)
+                                .font(.system(size: 10))
+                            Text(cat.name)
+                                .font(.system(size: 12, weight: .medium))
+                        }
+                        .foregroundStyle(isSelected ? col : VeloceTheme.textSecondary)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .background(
+                            isSelected ? col.opacity(0.15) : VeloceTheme.surface,
+                            in: Capsule()
+                        )
+                        .overlay(Capsule().strokeBorder(
+                            isSelected ? col.opacity(0.4) : VeloceTheme.divider,
+                            lineWidth: 1
+                        ))
+                    }
+                    .animation(.spring(response: 0.2), value: isSelected)
+                }
+            }
+        }
+    }
+
+    // MARK: - Empty state
+
     private var emptyState: some View {
-        VStack(spacing: 14) {
-            Image(systemName: "tray")
+        let isFiltering = !searchText.isEmpty || filterCategoryId != nil
+        return VStack(spacing: 14) {
+            Image(systemName: isFiltering ? "magnifyingglass" : "tray")
                 .font(.system(size: 36, weight: .light))
                 .foregroundStyle(VeloceTheme.textTertiary)
-            Text("No expenses yet")
+            Text(isFiltering ? "No results found" : "No expenses yet")
                 .font(.system(size: 15, weight: .medium))
                 .foregroundStyle(VeloceTheme.textSecondary)
-            Text("Try: \"coffee 40k\" or \"lunch 80k\"")
+            Text(isFiltering
+                 ? "Try a different search or filter"
+                 : "Try: \"coffee 40k\" or \"lunch 80k\"")
                 .font(.system(size: 13))
                 .foregroundStyle(VeloceTheme.textTertiary)
         }
