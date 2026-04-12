@@ -44,19 +44,35 @@ struct Expense: Identifiable, Codable, Equatable {
     var amount: Double
     var categoryId: UUID
     var date: Date
+    var note: String
 
     init(
         id: UUID = UUID(),
         title: String,
         amount: Double,
         categoryId: UUID,
-        date: Date = Date()
+        date: Date = Date(),
+        note: String = ""
     ) {
         self.id = id
         self.title = title
         self.amount = amount
         self.categoryId = categoryId
         self.date = date
+        self.note = note
+    }
+
+    // Custom decoder for backward compatibility — old exports lack `note`
+    enum CodingKeys: String, CodingKey { case id, title, amount, categoryId, date, note }
+
+    init(from decoder: Decoder) throws {
+        let c  = try decoder.container(keyedBy: CodingKeys.self)
+        id         = try c.decode(UUID.self,   forKey: .id)
+        title      = try c.decode(String.self, forKey: .title)
+        amount     = try c.decode(Double.self, forKey: .amount)
+        categoryId = try c.decode(UUID.self,   forKey: .categoryId)
+        date       = try c.decode(Date.self,   forKey: .date)
+        note       = try c.decodeIfPresent(String.self, forKey: .note) ?? ""
     }
 }
 

@@ -29,13 +29,9 @@ final class ExpenseViewModel: ObservableObject {
     @Published var highlightedCategoryId: UUID? = nil
     @Published var isHeightRelative = false
 
-    // Settings — backed by PersistenceStore
-    var monthlyIncome: Double {
-        didSet { PersistenceStore.shared.saveMonthlyIncome(monthlyIncome) }
-    }
-    var savingGoal: Double {
-        didSet { PersistenceStore.shared.saveSavingGoal(savingGoal) }
-    }
+    // Settings — @Published so any view binding to vm updates reactively
+    @Published var monthlyIncome: Double = 0
+    @Published var savingGoal:    Double = 0
 
     // Combine auto-save
     private var cancellables = Set<AnyCancellable>()
@@ -311,12 +307,13 @@ final class ExpenseViewModel: ObservableObject {
         let store = PersistenceStore.shared
 
         // Load persisted state (or fall back to defaults)
-        self.categories    = store.loadCategories() ?? Self.defaultCategories()
-        self.expenses      = store.loadExpenses()   ?? []
-        self.monthlyIncome = store.loadMonthlyIncome()
-        self.savingGoal    = store.loadSavingGoal()
+        // Use underscore form to bypass @Published setter during init
+        self.categories     = store.loadCategories() ?? Self.defaultCategories()
+        self.expenses       = store.loadExpenses()   ?? []
+        _monthlyIncome      = Published(wrappedValue: store.loadMonthlyIncome())
+        _savingGoal         = Published(wrappedValue: store.loadSavingGoal())
 
-        // Auto-save whenever published collections change (debounced 400 ms)
+        // Auto-save whenever published properties change (debounced 400 ms)
         $categories
             .dropFirst()                         // skip the initial assignment
             .debounce(for: .milliseconds(400), scheduler: RunLoop.main)
@@ -327,6 +324,18 @@ final class ExpenseViewModel: ObservableObject {
             .dropFirst()
             .debounce(for: .milliseconds(400), scheduler: RunLoop.main)
             .sink { store.saveExpenses($0) }
+            .store(in: &cancellables)
+
+        $monthlyIncome
+            .dropFirst()
+            .debounce(for: .milliseconds(400), scheduler: RunLoop.main)
+            .sink { store.saveMonthlyIncome($0) }
+            .store(in: &cancellables)
+
+        $savingGoal
+            .dropFirst()
+            .debounce(for: .milliseconds(400), scheduler: RunLoop.main)
+            .sink { store.saveSavingGoal($0) }
             .store(in: &cancellables)
     }
 }

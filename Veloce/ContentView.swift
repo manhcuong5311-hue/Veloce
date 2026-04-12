@@ -443,46 +443,175 @@ private struct ColumnsCard: View {
     }
 
     private var editHeader: some View {
-        HStack(alignment: .center, spacing: 8) {
-            VStack(alignment: .leading, spacing: 3) {
-                Text("Edit Budget")
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(VeloceTheme.textPrimary)
+        VStack(alignment: .leading, spacing: 10) {
+            // ── Title row ─────────────────────────────────────────
+            HStack(alignment: .center, spacing: 8) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Edit Budget")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(VeloceTheme.textPrimary)
 
-                // Remaining pool – turns red when over-allocated
-                HStack(spacing: 4) {
-                    Circle()
-                        .fill(remainingBudget < 0 ? VeloceTheme.over : VeloceTheme.ok)
-                        .frame(width: 5, height: 5)
-                    Text(remainingBudget < 0
-                         ? "\((-remainingBudget).toCompactCurrency()) over"
-                         : "\(remainingBudget.toCompactCurrency()) remaining")
-                        .font(.system(size: 12, weight: .medium, design: .rounded))
-                        .foregroundStyle(remainingBudget < 0
-                                         ? VeloceTheme.over
-                                         : VeloceTheme.textSecondary)
-                        .contentTransition(.numericText())
-                        .animation(.spring(response: 0.25), value: remainingBudget)
+                    // Remaining pool indicator
+                    HStack(spacing: 4) {
+                        Circle()
+                            .fill(remainingBudget < 0 ? VeloceTheme.over : VeloceTheme.ok)
+                            .frame(width: 5, height: 5)
+                        Text(remainingBudget < 0
+                             ? "\((-remainingBudget).toCompactCurrency()) over"
+                             : "\(remainingBudget.toCompactCurrency()) remaining")
+                            .font(.system(size: 12, weight: .medium, design: .rounded))
+                            .foregroundStyle(remainingBudget < 0
+                                             ? VeloceTheme.over
+                                             : VeloceTheme.textSecondary)
+                            .contentTransition(.numericText())
+                            .animation(.spring(response: 0.25), value: remainingBudget)
+                    }
+                }
+
+                Spacer()
+
+                Button {
+                    withAnimation(.spring(response: 0.38, dampingFraction: 0.80)) {
+                        isEditingBudget  = false
+                        activeCategoryId = nil
+                    }
+                } label: {
+                    Text("Done")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(VeloceTheme.accent)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 7)
+                        .background(VeloceTheme.accentBg, in: Capsule())
                 }
             }
 
-            Spacer()
-
-            // Done button
-            Button {
-                withAnimation(.spring(response: 0.38, dampingFraction: 0.80)) {
-                    isEditingBudget  = false
-                    activeCategoryId = nil
+            // ── Savings preview panel (visible when income is set) ─
+            if vm.monthlyIncome > 0 {
+                savingsPreviewPanel
+                    .transition(.move(edge: .top).combined(with: .opacity))
+            } else {
+                // Hint to set income
+                HStack(spacing: 6) {
+                    Image(systemName: "info.circle")
+                        .font(.system(size: 11))
+                    Text("Set monthly salary in Settings to see savings impact")
+                        .font(.system(size: 11))
                 }
-            } label: {
-                Text("Done")
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(VeloceTheme.accent)
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 7)
-                    .background(VeloceTheme.accentBg, in: Capsule())
+                .foregroundStyle(VeloceTheme.textTertiary)
+                .padding(8)
+                .background(VeloceTheme.surfaceRaised, in: RoundedRectangle(cornerRadius: 8))
+                .transition(.opacity)
             }
         }
+        .animation(.spring(response: 0.35, dampingFraction: 0.82), value: vm.monthlyIncome > 0)
+    }
+
+    /// Live panel: income → allocated budget → projected savings
+    private var savingsPreviewPanel: some View {
+        let income      = vm.monthlyIncome
+        let budget      = vm.totalBudget        // changes in real-time as user drags
+        let savings     = income - budget
+        let isSaving    = savings >= 0
+        let budgetRatio = income > 0 ? min(budget / income, 1.0) : 0
+        let savingsPct  = income > 0 ? abs(savings) / income * 100 : 0
+
+        return VStack(spacing: 8) {
+            // ── Numbers row ───────────────────────────────────────
+            HStack {
+                // Income
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("Income")
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundStyle(VeloceTheme.textTertiary)
+                    Text(income.toCompactCurrency())
+                        .font(.system(size: 12, weight: .semibold, design: .rounded))
+                        .foregroundStyle(VeloceTheme.textSecondary)
+                }
+
+                Spacer()
+
+                // Arrow
+                Image(systemName: "arrow.right")
+                    .font(.system(size: 9))
+                    .foregroundStyle(VeloceTheme.textTertiary)
+
+                Spacer()
+
+                // Budget
+                VStack(alignment: .center, spacing: 1) {
+                    Text("Budget")
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundStyle(VeloceTheme.textTertiary)
+                    Text(budget.toCompactCurrency())
+                        .font(.system(size: 12, weight: .semibold, design: .rounded))
+                        .foregroundStyle(VeloceTheme.accent)
+                        .contentTransition(.numericText())
+                        .animation(.spring(response: 0.25), value: budget)
+                }
+
+                Spacer()
+
+                // Arrow
+                Image(systemName: "arrow.right")
+                    .font(.system(size: 9))
+                    .foregroundStyle(VeloceTheme.textTertiary)
+
+                Spacer()
+
+                // Savings
+                VStack(alignment: .trailing, spacing: 1) {
+                    Text("Savings")
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundStyle(VeloceTheme.textTertiary)
+                    HStack(spacing: 2) {
+                        Text(isSaving ? "+" : "-")
+                            .font(.system(size: 11, weight: .bold, design: .rounded))
+                        Text(abs(savings).toCompactCurrency())
+                            .font(.system(size: 12, weight: .bold, design: .rounded))
+                    }
+                    .foregroundStyle(isSaving ? VeloceTheme.ok : VeloceTheme.over)
+                    .contentTransition(.numericText())
+                    .animation(.spring(response: 0.25), value: savings)
+                }
+            }
+
+            // ── Progress bar: budget / income ─────────────────────
+            GeometryReader { geo in
+                ZStack(alignment: .leading) {
+                    Capsule()
+                        .fill(VeloceTheme.divider)
+                        .frame(height: 6)
+                    Capsule()
+                        .fill(
+                            LinearGradient(
+                                colors: isSaving
+                                    ? [VeloceTheme.accent, VeloceTheme.ok]
+                                    : [VeloceTheme.caution, VeloceTheme.over],
+                                startPoint: .leading,
+                                endPoint:   .trailing
+                            )
+                        )
+                        .frame(width: geo.size.width * CGFloat(budgetRatio), height: 6)
+                        .animation(.spring(response: 0.35, dampingFraction: 0.8), value: budgetRatio)
+                }
+            }
+            .frame(height: 6)
+
+            // ── Summary chip ──────────────────────────────────────
+            HStack(spacing: 4) {
+                Image(systemName: isSaving ? "leaf.fill" : "exclamationmark.triangle.fill")
+                    .font(.system(size: 10))
+                Text(isSaving
+                     ? "Saving \(String(format: "%.0f", savingsPct))% of income"
+                     : "Over income by \(String(format: "%.0f", savingsPct))%")
+                    .font(.system(size: 11, weight: .medium))
+            }
+            .foregroundStyle(isSaving ? VeloceTheme.ok : VeloceTheme.over)
+            .contentTransition(.numericText())
+            .animation(.spring(response: 0.25), value: isSaving)
+        }
+        .padding(10)
+        .background(VeloceTheme.surfaceRaised, in: RoundedRectangle(cornerRadius: 11, style: .continuous))
     }
 
     // MARK: - Edit Budget button (replaces the old Absolute/Relative toggle)
