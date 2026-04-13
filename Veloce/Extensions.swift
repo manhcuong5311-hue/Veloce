@@ -147,6 +147,53 @@ extension Color {
     func pastel(opacity: Double = 0.15) -> Color { self.opacity(opacity) }
 }
 
+// MARK: - Flow Layout
+// Arranges children horizontally, wrapping to the next line when they overflow.
+
+struct FlowLayout: Layout {
+    var spacing: CGFloat = 8
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        layout(subviews: subviews, in: proposal.width ?? 0).size
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        let result = layout(subviews: subviews, in: bounds.width)
+        for (subview, origin) in zip(subviews, result.origins) {
+            subview.place(at: CGPoint(x: bounds.minX + origin.x, y: bounds.minY + origin.y), proposal: .unspecified)
+        }
+    }
+
+    private struct LayoutResult {
+        var origins: [CGPoint]
+        var size:    CGSize
+    }
+
+    private func layout(subviews: Subviews, in width: CGFloat) -> LayoutResult {
+        var origins: [CGPoint] = []
+        var x: CGFloat = 0
+        var y: CGFloat = 0
+        var rowH: CGFloat = 0
+
+        for subview in subviews {
+            let size = subview.sizeThatFits(.unspecified)
+            if x + size.width > width && x > 0 {
+                x = 0
+                y += rowH + spacing
+                rowH = 0
+            }
+            origins.append(CGPoint(x: x, y: y))
+            x += size.width + spacing
+            rowH = max(rowH, size.height)
+        }
+
+        return LayoutResult(
+            origins: origins,
+            size:    CGSize(width: width, height: y + rowH)
+        )
+    }
+}
+
 // MARK: - View modifiers
 
 struct VeloceCard: ViewModifier {

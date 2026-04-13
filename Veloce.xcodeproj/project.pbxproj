@@ -289,7 +289,7 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Veloce/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = "Veloce AI";
+				INFOPLIST_KEY_CFBundleDisplayName = VeloceAI;
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Veloce uses your microphone to add expenses by voice.";
 				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "Veloce uses speech recognition to convert voice into expense entries.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -327,7 +327,7 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Veloce/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = "Veloce AI";
+				INFOPLIST_KEY_CFBundleDisplayName = VeloceAI;
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Veloce uses your microphone to add expenses by voice.";
 				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "Veloce uses speech recognition to convert voice into expense entries.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;

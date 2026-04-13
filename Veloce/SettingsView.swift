@@ -8,6 +8,7 @@ struct SettingsView: View {
     @EnvironmentObject private var authVM:      AuthViewModel
     @EnvironmentObject private var subManager:  SubscriptionManager
     @EnvironmentObject private var vm:          ExpenseViewModel
+    @EnvironmentObject private var notifMgr:    NotificationManager
     @Environment(\.dismiss) private var dismiss
 
     @AppStorage("veloce_ai_suggestions")  private var aiSuggestionsEnabled = true
@@ -26,6 +27,7 @@ struct SettingsView: View {
     @State private var showEditSaving         = false
     @State private var showAccentColorPicker  = false
     @State private var showBudgetResetDay     = false
+    @State private var showReminderTimePicker = false
 
     private var selectedCurrency: Binding<AppCurrency> {
         Binding(
@@ -52,6 +54,7 @@ struct SettingsView: View {
                     accountSection
                     premiumSection
                     preferencesSection
+                    notificationsSection
                     dataSection
                     legalSection
                     faqRow
@@ -100,6 +103,9 @@ struct SettingsView: View {
         }
         .sheet(isPresented: $showBudgetResetDay) {
             BudgetResetDaySheet()
+        }
+        .sheet(isPresented: $showReminderTimePicker) {
+            ReminderTimePickerSheet(notifMgr: notifMgr)
         }
         .confirmationDialog(
             "Sign out of Veloce?",
@@ -440,6 +446,159 @@ struct SettingsView: View {
         } header: {
             sectionHeader("Preferences", icon: "gearshape")
         }
+    }
+
+    // MARK: - NOTIFICATIONS ───────────────────────────────────────────
+
+    private var notificationsSection: some View {
+        Section {
+            // Permission status banner
+            if notifMgr.authStatus == .denied {
+                Button(action: { notifMgr.openSystemSettings() }) {
+                    HStack(spacing: 10) {
+                        Image(systemName: "bell.slash.fill")
+                            .foregroundStyle(VeloceTheme.over)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Notifications disabled")
+                                .font(.system(size: 14, weight: .medium))
+                                .foregroundStyle(VeloceTheme.textPrimary)
+                            Text("Tap to open System Settings")
+                                .font(.system(size: 12))
+                                .foregroundStyle(VeloceTheme.textSecondary)
+                        }
+                        Spacer()
+                        Image(systemName: "arrow.up.right")
+                            .font(.system(size: 11))
+                            .foregroundStyle(VeloceTheme.textTertiary)
+                    }
+                }
+                .listRowBackground(VeloceTheme.over.opacity(0.06))
+            }
+
+            // Daily Reminder toggle
+            HStack {
+                Label {
+                    Text("Daily Reminder")
+                        .foregroundStyle(VeloceTheme.textPrimary)
+                } icon: {
+                    Image(systemName: "bell.fill")
+                        .foregroundStyle(VeloceTheme.accent)
+                }
+                Spacer()
+                Toggle("", isOn: Binding(
+                    get: { notifMgr.dailyEnabled },
+                    set: { notifMgr.dailyEnabled = $0 }
+                ))
+                .tint(VeloceTheme.accent)
+                .labelsHidden()
+            }
+
+            // Budget Alerts toggle
+            HStack {
+                Label {
+                    Text("Budget Alerts")
+                        .foregroundStyle(VeloceTheme.textPrimary)
+                } icon: {
+                    Image(systemName: "chart.bar.fill")
+                        .foregroundStyle(VeloceTheme.caution)
+                }
+                Spacer()
+                Toggle("", isOn: Binding(
+                    get: { notifMgr.budgetEnabled },
+                    set: { notifMgr.budgetEnabled = $0 }
+                ))
+                .tint(VeloceTheme.accent)
+                .labelsHidden()
+            }
+
+            // Reminder Time
+            Button { showReminderTimePicker = true } label: {
+                HStack {
+                    Label {
+                        Text("Reminder Time")
+                            .foregroundStyle(VeloceTheme.textPrimary)
+                    } icon: {
+                        Image(systemName: "clock.fill")
+                            .foregroundStyle(VeloceTheme.accent)
+                    }
+                    Spacer()
+                    Text(String(format: "%02d:%02d", notifMgr.reminderHour, notifMgr.reminderMinute))
+                        .font(.system(size: 14, weight: .semibold, design: .rounded))
+                        .foregroundStyle(VeloceTheme.accent)
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(VeloceTheme.textTertiary)
+                }
+            }
+
+            // Streak indicator (if active)
+            if notifMgr.dailyStreak >= 2 {
+                HStack(spacing: 10) {
+                    Text("🔥")
+                        .font(.system(size: 20))
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("You're on a \(notifMgr.dailyStreak)-day streak!")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(VeloceTheme.textPrimary)
+                        Text("Keep logging expenses daily to maintain it")
+                            .font(.system(size: 12))
+                            .foregroundStyle(VeloceTheme.textSecondary)
+                    }
+                }
+                .padding(.vertical, 4)
+                .listRowBackground(
+                    RoundedRectangle(cornerRadius: 10)
+                        .fill(Color(hex: "FF6B35").opacity(0.07))
+                        .padding(.horizontal, -4)
+                )
+            }
+
+            // Test notification (only when authorized)
+            if notifMgr.authStatus == .authorized {
+                Button(action: { notifMgr.sendTestNotification() }) {
+                    HStack {
+                        Label {
+                            Text("Send Test Notification")
+                                .foregroundStyle(VeloceTheme.textPrimary)
+                        } icon: {
+                            Image(systemName: "bell.badge")
+                                .foregroundStyle(VeloceTheme.accent)
+                        }
+                        Spacer()
+                        Text("~2 sec")
+                            .font(.system(size: 12))
+                            .foregroundStyle(VeloceTheme.textTertiary)
+                    }
+                }
+            }
+
+            // Open System Settings link
+            Button(action: { notifMgr.openSystemSettings() }) {
+                Label {
+                    Text("Open System Settings")
+                        .foregroundStyle(VeloceTheme.textPrimary)
+                } icon: {
+                    Image(systemName: "gear")
+                        .foregroundStyle(VeloceTheme.textSecondary)
+                }
+            }
+
+        } header: {
+            sectionHeader("Notifications", icon: "bell.badge")
+        } footer: {
+            switch notifMgr.authStatus {
+            case .authorized:
+                Text("Notifications are enabled. Veloce will remind you to log expenses and alert you when budgets are nearly full.")
+                    .font(.system(size: 12)).foregroundStyle(VeloceTheme.textTertiary)
+            case .denied:
+                Text("Enable notifications in System Settings to receive reminders and budget alerts.")
+                    .font(.system(size: 12)).foregroundStyle(VeloceTheme.textTertiary)
+            default:
+                Text("Allow notifications to get daily reminders and smart budget alerts.")
+                    .font(.system(size: 12)).foregroundStyle(VeloceTheme.textTertiary)
+            }
+        }
+        .task { await notifMgr.refreshStatus() }
     }
 
     // MARK: - DATA ────────────────────────────────────────────────────
@@ -891,6 +1050,104 @@ private struct DocumentPicker: UIViewControllerRepresentable {
 
 // MARK: - Preview
 
+// MARK: - Reminder Time Picker Sheet
+
+struct ReminderTimePickerSheet: View {
+    @ObservedObject var notifMgr: NotificationManager
+    @Environment(\.dismiss) private var dismiss
+
+    // Build a Date from current hour/minute for the DatePicker
+    @State private var pickerDate: Date = Date()
+
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                VeloceTheme.bg.ignoresSafeArea()
+                VStack(spacing: 28) {
+                    // Icon + description
+                    VStack(spacing: 12) {
+                        ZStack {
+                            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                                .fill(VeloceTheme.accentBg)
+                                .frame(width: 68, height: 68)
+                            Image(systemName: "clock.fill")
+                                .font(.system(size: 28, weight: .medium))
+                                .foregroundStyle(VeloceTheme.accent)
+                        }
+                        Text("Daily Reminder Time")
+                            .font(.system(size: 17, weight: .semibold))
+                            .foregroundStyle(VeloceTheme.textPrimary)
+                        Text("Choose when Veloce should remind you\nto log today's expenses.")
+                            .font(.system(size: 13))
+                            .foregroundStyle(VeloceTheme.textSecondary)
+                            .multilineTextAlignment(.center)
+                    }
+                    .padding(.top, 12)
+
+                    // Time picker
+                    DatePicker("", selection: $pickerDate, displayedComponents: .hourAndMinute)
+                        .datePickerStyle(.wheel)
+                        .labelsHidden()
+                        .tint(VeloceTheme.accent)
+                        .frame(maxWidth: .infinity)
+                        .veloceCard()
+
+                    // Info note
+                    HStack(spacing: 6) {
+                        Image(systemName: "info.circle")
+                            .font(.system(size: 11))
+                        Text("A ±15 minute variation is applied to feel more natural.")
+                            .font(.system(size: 12))
+                    }
+                    .foregroundStyle(VeloceTheme.textTertiary)
+
+                    // Save button
+                    Button(action: save) {
+                        Text("Save")
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundStyle(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 16)
+                            .background(
+                                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                    .fill(VeloceTheme.accent)
+                            )
+                    }
+
+                    Spacer()
+                }
+                .padding(20)
+            }
+            .navigationTitle("Reminder Time")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button("Cancel") { dismiss() }
+                        .foregroundStyle(VeloceTheme.textSecondary)
+                }
+            }
+        }
+        .presentationDetents([.medium])
+        .presentationDragIndicator(.visible)
+        .presentationBackground(VeloceTheme.bg)
+        .preferredColorScheme(.light)
+        .onAppear {
+            var comps        = Calendar.current.dateComponents([.year, .month, .day], from: Date())
+            comps.hour       = notifMgr.reminderHour
+            comps.minute     = notifMgr.reminderMinute
+            pickerDate       = Calendar.current.date(from: comps) ?? Date()
+        }
+    }
+
+    private func save() {
+        let comps              = Calendar.current.dateComponents([.hour, .minute], from: pickerDate)
+        notifMgr.reminderHour  = comps.hour   ?? 20
+        notifMgr.reminderMinute = comps.minute ?? 0
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        dismiss()
+    }
+}
+
 // MARK: - Accent Color Picker Sheet
 
 struct AccentColorPickerSheet: View {
@@ -1168,4 +1425,5 @@ struct BudgetResetDaySheet: View {
         .environmentObject(AuthViewModel())
         .environmentObject(SubscriptionManager.shared)
         .environmentObject(ExpenseViewModel())
+        .environmentObject(NotificationManager.shared)
 }

@@ -5,9 +5,11 @@ import FirebaseCore
 
 @main
 struct VeloceApp: App {
-    @StateObject private var authVM     = AuthViewModel()
-    @StateObject private var subManager = SubscriptionManager.shared
-    @StateObject private var vm         = ExpenseViewModel()
+    @StateObject private var authVM      = AuthViewModel()
+    @StateObject private var subManager  = SubscriptionManager.shared
+    @StateObject private var vm          = ExpenseViewModel()
+    @StateObject private var notifMgr    = NotificationManager.shared
+    @StateObject private var ratingMgr   = RatingManager.shared
 
     init() {
         FirebaseApp.configure()
@@ -19,6 +21,8 @@ struct VeloceApp: App {
                 .environmentObject(authVM)
                 .environmentObject(subManager)
                 .environmentObject(vm)
+                .environmentObject(notifMgr)
+                .environmentObject(ratingMgr)
         }
     }
 }

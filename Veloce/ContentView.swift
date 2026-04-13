@@ -6,6 +6,8 @@ struct ContentView: View {
     @EnvironmentObject private var authVM:     AuthViewModel
     @EnvironmentObject private var vm:         ExpenseViewModel
     @EnvironmentObject private var subManager: SubscriptionManager
+    @EnvironmentObject private var ratingMgr:  RatingManager
+    @EnvironmentObject private var notifMgr:   NotificationManager
 
     @State private var selectedCategory:   Category? = nil
     @State private var editingExpense:     Expense?  = nil
@@ -15,6 +17,7 @@ struct ContentView: View {
     @State private var showAIAssistant              = false
     @State private var showEditGroups               = false
     @State private var showSettings                 = false
+    @State private var showInsights                 = false
 
     var body: some View {
         NavigationStack {
@@ -23,6 +26,10 @@ struct ContentView: View {
 
                 ScrollView(showsIndicators: false) {
                     LazyVStack(spacing: 0, pinnedViews: []) {
+                        // ── Notification denied banner ───────────────────────
+                        NotificationDeniedBanner()
+                            .environmentObject(notifMgr)
+
                         // ── Summary header ───────────────────────────────────
                         SummaryHeaderView()
                             .environmentObject(vm)
@@ -55,7 +62,30 @@ struct ContentView: View {
             .navigationTitle("Veloce")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
+                // AI entry point — top-left, subtle sparkle
+                ToolbarItem(placement: .topBarLeading) {
+                    Button(action: handleAITap) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "sparkles")
+                                .font(.system(size: 13, weight: .semibold))
+                            Text("AI")
+                                .font(.system(size: 12, weight: .semibold))
+                        }
+                        .foregroundStyle(VeloceTheme.accent)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .background(VeloceTheme.accentBg, in: Capsule())
+                    }
+                }
+                // Insights + Settings — top-right
+                ToolbarItemGroup(placement: .topBarTrailing) {
+                    Button(action: { showInsights = true }) {
+                        Image(systemName: "chart.bar.xaxis")
+                            .font(.system(size: 15, weight: .medium))
+                            .foregroundStyle(VeloceTheme.textSecondary)
+                            .frame(width: 34, height: 34)
+                            .background(VeloceTheme.surfaceRaised, in: Circle())
+                    }
                     Button(action: { showSettings = true }) {
                         Image(systemName: "gearshape.fill")
                             .font(.system(size: 15, weight: .medium))
@@ -95,13 +125,25 @@ struct ContentView: View {
                 .environmentObject(vm)
                 .environmentObject(subManager)
         }
+        .sheet(isPresented: $showInsights) {
+            InsightsView()
+                .environmentObject(vm)
+        }
         .sheet(isPresented: $showSettings) {
             SettingsView()
                 .environmentObject(authVM)
                 .environmentObject(subManager)
                 .environmentObject(vm)
+                .environmentObject(NotificationManager.shared)
         }
         .preferredColorScheme(.light)
+        .overlay(alignment: .bottom) {
+            RatingSoftPromptView(ratingManager: ratingMgr)
+                .ignoresSafeArea()
+        }
+        .onAppear {
+            RatingManager.shared.recordActiveDay()
+        }
     }
 
     private func handleAITap() {
@@ -234,9 +276,10 @@ private struct ColumnsCard: View {
     let onEditGroups: () -> Void
 
     // Edit-budget mode state
-    @State private var isEditingBudget:  Bool   = false
-    @State private var activeCategoryId: UUID?  = nil
-    @State private var fixedTotalBudget: Double = 0   // total frozen on entry
+    @State private var isEditingBudget:       Bool   = false
+    @State private var activeCategoryId:      UUID?  = nil
+    @State private var fixedTotalBudget:      Double = 0   // total frozen on entry
+    @State private var showConstraintModal:   Bool   = false
 
     // Panel resize state
     @AppStorage("spending_panel_state") private var savedState: String = SpendingPanelState.medium.rawValue
@@ -348,6 +391,18 @@ private struct ColumnsCard: View {
         .animation(.spring(response: 0.28), value: isDragging)
         .onAppear {
             panelState = SpendingPanelState(rawValue: savedState) ?? .medium
+        }
+        .alert("Can't Update Budget", isPresented: $showConstraintModal) {
+            Button("Adjust Saving Target") {
+                // Dismiss edit mode — user should go to Settings
+                withAnimation(.spring(response: 0.38, dampingFraction: 0.80)) {
+                    isEditingBudget  = false
+                    activeCategoryId = nil
+                }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Your total budget is constrained by your saving target (\(vm.savingGoal.toCompactCurrency())). Reduce the saving target in Settings to allocate more budget.")
         }
     }
 
@@ -506,119 +561,164 @@ private struct ColumnsCard: View {
         .animation(.spring(response: 0.35, dampingFraction: 0.82), value: vm.monthlyIncome > 0)
     }
 
-    /// Live panel: income → allocated budget → projected savings
+    /// Live panel: income → saving target reserved → budget ceiling → allocated → remaining.
+    /// When no saving target is set falls back to the simpler income → budget → savings view.
     private var savingsPreviewPanel: some View {
         let income      = vm.monthlyIncome
-        let budget      = vm.totalBudget        // changes in real-time as user drags
-        let savings     = income - budget
-        let isSaving    = savings >= 0
-        let budgetRatio = income > 0 ? min(budget / income, 1.0) : 0
-        let savingsPct  = income > 0 ? abs(savings) / income * 100 : 0
+        let savingGoal  = vm.savingGoal
+        let budget      = vm.totalBudget        // updates in real-time as user drags
+        let hasSaving   = savingGoal > 0
 
-        return VStack(spacing: 8) {
+        // With saving target: ceiling = income - savingGoal
+        // Without:            ceiling = income (no reserved amount)
+        let ceiling     = hasSaving ? max(0, income - savingGoal) : income
+        let unallocated = ceiling - budget
+        let isWithin    = budget <= ceiling
+
+        // Ratio of allocated budget against total income (for the bar)
+        let allocRatio    = income > 0 ? min(budget  / income, 1.0) : 0
+        let ceilingRatio  = income > 0 ? min(ceiling / income, 1.0) : 1.0
+        let savingsPct    = income > 0 ? savingGoal / income * 100 : 0
+
+        return VStack(spacing: 10) {
             // ── Numbers row ───────────────────────────────────────
-            HStack {
-                // Income
-                VStack(alignment: .leading, spacing: 1) {
-                    Text("Income")
-                        .font(.system(size: 10, weight: .medium))
-                        .foregroundStyle(VeloceTheme.textTertiary)
-                    Text(income.toCompactCurrency())
-                        .font(.system(size: 12, weight: .semibold, design: .rounded))
-                        .foregroundStyle(VeloceTheme.textSecondary)
+            HStack(alignment: .top, spacing: 0) {
+                savingsColumn(label: "Income",    value: income.toCompactCurrency(),   color: VeloceTheme.textSecondary)
+                arrowSpacer()
+                if hasSaving {
+                    savingsColumn(
+                        label: "Reserved",
+                        value: savingGoal.toCompactCurrency(),
+                        color: VeloceTheme.ok,
+                        prefix: "-"
+                    )
+                    arrowSpacer()
+                    savingsColumn(
+                        label: "Ceiling",
+                        value: ceiling.toCompactCurrency(),
+                        color: isWithin ? VeloceTheme.textSecondary : VeloceTheme.over
+                    )
+                    arrowSpacer()
                 }
-
-                Spacer()
-
-                // Arrow
-                Image(systemName: "arrow.right")
-                    .font(.system(size: 9))
-                    .foregroundStyle(VeloceTheme.textTertiary)
-
-                Spacer()
-
-                // Budget
-                VStack(alignment: .center, spacing: 1) {
-                    Text("Budget")
-                        .font(.system(size: 10, weight: .medium))
-                        .foregroundStyle(VeloceTheme.textTertiary)
-                    Text(budget.toCompactCurrency())
-                        .font(.system(size: 12, weight: .semibold, design: .rounded))
-                        .foregroundStyle(VeloceTheme.accent)
-                        .contentTransition(.numericText())
-                        .animation(.spring(response: 0.25), value: budget)
-                }
-
-                Spacer()
-
-                // Arrow
-                Image(systemName: "arrow.right")
-                    .font(.system(size: 9))
-                    .foregroundStyle(VeloceTheme.textTertiary)
-
-                Spacer()
-
-                // Savings
-                VStack(alignment: .trailing, spacing: 1) {
-                    Text("Savings")
-                        .font(.system(size: 10, weight: .medium))
-                        .foregroundStyle(VeloceTheme.textTertiary)
-                    HStack(spacing: 2) {
-                        Text(isSaving ? "+" : "-")
-                            .font(.system(size: 11, weight: .bold, design: .rounded))
-                        Text(abs(savings).toCompactCurrency())
-                            .font(.system(size: 12, weight: .bold, design: .rounded))
-                    }
-                    .foregroundStyle(isSaving ? VeloceTheme.ok : VeloceTheme.over)
-                    .contentTransition(.numericText())
-                    .animation(.spring(response: 0.25), value: savings)
-                }
+                savingsColumn(
+                    label: "Budget",
+                    value: budget.toCompactCurrency(),
+                    color: VeloceTheme.accent,
+                    animate: true
+                )
+                arrowSpacer()
+                savingsColumn(
+                    label: unallocated >= 0 ? "Free" : "Over",
+                    value: abs(unallocated).toCompactCurrency(),
+                    color: unallocated >= 0 ? VeloceTheme.ok : VeloceTheme.over,
+                    prefix: unallocated >= 0 ? "+" : "-",
+                    animate: true
+                )
             }
 
-            // ── Progress bar: budget / income ─────────────────────
+            // ── Segmented bar: saving goal | allocated budget | free ──
             GeometryReader { geo in
                 ZStack(alignment: .leading) {
+                    // Full track
                     Capsule()
                         .fill(VeloceTheme.divider)
-                        .frame(height: 6)
+                        .frame(height: 7)
+
+                    // Saving reserved portion (right end, rendered as remaining)
+                    if hasSaving && ceilingRatio < 1.0 {
+                        Capsule()
+                            .fill(VeloceTheme.ok.opacity(0.30))
+                            .frame(width: geo.size.width * CGFloat(1 - ceilingRatio), height: 7)
+                            .offset(x: geo.size.width * CGFloat(ceilingRatio))
+                    }
+
+                    // Allocated budget
                     Capsule()
                         .fill(
                             LinearGradient(
-                                colors: isSaving
-                                    ? [VeloceTheme.accent, VeloceTheme.ok]
+                                colors: isWithin
+                                    ? [VeloceTheme.accent, VeloceTheme.accent.opacity(0.7)]
                                     : [VeloceTheme.caution, VeloceTheme.over],
                                 startPoint: .leading,
                                 endPoint:   .trailing
                             )
                         )
-                        .frame(width: geo.size.width * CGFloat(budgetRatio), height: 6)
-                        .animation(.spring(response: 0.35, dampingFraction: 0.8), value: budgetRatio)
+                        .frame(width: geo.size.width * CGFloat(allocRatio), height: 7)
+                        .animation(.spring(response: 0.35, dampingFraction: 0.8), value: allocRatio)
                 }
             }
-            .frame(height: 6)
+            .frame(height: 7)
 
             // ── Summary chip ──────────────────────────────────────
             HStack(spacing: 4) {
-                Image(systemName: isSaving ? "leaf.fill" : "exclamationmark.triangle.fill")
-                    .font(.system(size: 10))
-                Text(isSaving
-                     ? "Saving \(String(format: "%.0f", savingsPct))% of income"
-                     : "Over income by \(String(format: "%.0f", savingsPct))%")
-                    .font(.system(size: 11, weight: .medium))
+                if hasSaving {
+                    Image(systemName: isWithin ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
+                        .font(.system(size: 10))
+                    Text(isWithin
+                         ? "Saving target reserved: \(String(format: "%.0f", savingsPct))%"
+                         : "Budget exceeds saving target ceiling by \((-unallocated).toCompactCurrency())")
+                        .font(.system(size: 11, weight: .medium))
+                } else {
+                    let pct = income > 0 ? max(0, income - budget) / income * 100 : 0
+                    Image(systemName: budget <= income ? "leaf.fill" : "exclamationmark.triangle.fill")
+                        .font(.system(size: 10))
+                    Text(budget <= income
+                         ? "Saving \(String(format: "%.0f", pct))% of income"
+                         : "Over income by \(String(format: "%.0f", income > 0 ? (budget-income)/income*100 : 0))%")
+                        .font(.system(size: 11, weight: .medium))
+                }
             }
-            .foregroundStyle(isSaving ? VeloceTheme.ok : VeloceTheme.over)
+            .foregroundStyle(isWithin ? VeloceTheme.ok : VeloceTheme.over)
             .contentTransition(.numericText())
-            .animation(.spring(response: 0.25), value: isSaving)
+            .animation(.spring(response: 0.25), value: isWithin)
         }
         .padding(10)
         .background(VeloceTheme.surfaceRaised, in: RoundedRectangle(cornerRadius: 11, style: .continuous))
+    }
+
+    private func savingsColumn(
+        label:   String,
+        value:   String,
+        color:   Color,
+        prefix:  String = "",
+        animate: Bool   = false
+    ) -> some View {
+        VStack(alignment: .center, spacing: 1) {
+            Text(label)
+                .font(.system(size: 9, weight: .medium))
+                .foregroundStyle(VeloceTheme.textTertiary)
+            HStack(spacing: 1) {
+                if !prefix.isEmpty {
+                    Text(prefix)
+                        .font(.system(size: 10, weight: .bold, design: .rounded))
+                }
+                Text(value)
+                    .font(.system(size: 11, weight: .semibold, design: .rounded))
+                    .if(animate) { $0.contentTransition(.numericText()) }
+            }
+            .foregroundStyle(color)
+        }
+    }
+
+    private func arrowSpacer() -> some View {
+        Image(systemName: "chevron.right")
+            .font(.system(size: 7, weight: .semibold))
+            .foregroundStyle(VeloceTheme.textTertiary)
+            .frame(maxWidth: .infinity)
+            .padding(.top, 12)
     }
 
     // MARK: - Edit Budget button (replaces the old Absolute/Relative toggle)
 
     private var editBudgetButton: some View {
         Button {
-            fixedTotalBudget = vm.totalBudget   // freeze total before entering
+            // Use the saving-target ceiling as the budget pool.
+            // This lets bars be dragged UP as long as the total stays within (salary − saving goal).
+            // Falls back to 2× current total when no income is configured.
+            let ceiling = vm.maxAllowedTotalBudget
+            fixedTotalBudget = ceiling.isFinite
+                ? max(ceiling, vm.totalBudget)   // at least current total; grows to ceiling
+                : vm.totalBudget * 2             // no income set → generous headroom
             withAnimation(.spring(response: 0.38, dampingFraction: 0.80)) {
                 isEditingBudget = true
             }
@@ -654,18 +754,26 @@ private struct ColumnsCard: View {
 
     // MARK: - Budget constraint logic
 
-    /// Applies a new budget for one category, clamped so total never exceeds fixedTotalBudget.
+    /// Applies a new budget for one category.
+    /// Two constraints are enforced in order:
+    ///   1. Total must not exceed `fixedTotalBudget` (the frozen pool on edit-mode entry).
+    ///   2. Total must not exceed `salary - savingTarget` (the saving-target ceiling).
+    /// If the saving target is the binding constraint, a modal is shown explaining why.
     private func applyBudget(_ newBudget: Double, for category: Category) {
-        // Sum of every other category's budget
         let othersTotal = vm.categories
             .filter { $0.id != category.id }
             .reduce(0) { $0 + $1.budget }
 
+        // fixedTotalBudget is already set to max(savingCeiling, currentTotal) on entry,
+        // so it IS the effective cap. No redundant min() needed.
         let maxAllowed = max(0, fixedTotalBudget - othersTotal)
         let clamped    = min(newBudget, maxAllowed)
 
-        // Warn with haptic when hitting the wall
         if newBudget > maxAllowed {
+            // Blocked by the saving-target ceiling — explain why
+            if vm.monthlyIncome > 0 {
+                showConstraintModal = true
+            }
             UINotificationFeedbackGenerator().notificationOccurred(.warning)
         }
 
@@ -863,6 +971,44 @@ private struct DaySection: View {
     }
 }
 
+// MARK: - Notification Denied Banner
+
+private struct NotificationDeniedBanner: View {
+    @EnvironmentObject var notifMgr: NotificationManager
+
+    var body: some View {
+        if notifMgr.authStatus == .denied {
+            Button(action: { notifMgr.openSystemSettings() }) {
+                HStack(spacing: 10) {
+                    Image(systemName: "bell.slash.fill")
+                        .font(.system(size: 14))
+                        .foregroundStyle(VeloceTheme.over)
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text("Notifications are off")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(VeloceTheme.textPrimary)
+                        Text("Tap to enable in Settings")
+                            .font(.system(size: 11))
+                            .foregroundStyle(VeloceTheme.textSecondary)
+                    }
+                    Spacer()
+                    Text("Enable")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(VeloceTheme.accent)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 5)
+                        .background(VeloceTheme.accentBg, in: Capsule())
+                }
+                .padding(.horizontal, 20)
+                .padding(.vertical, 10)
+                .background(VeloceTheme.over.opacity(0.06))
+            }
+            .buttonStyle(.plain)
+            .transition(.move(edge: .top).combined(with: .opacity))
+        }
+    }
+}
+
 // MARK: - Preview
 
 #Preview {
@@ -870,4 +1016,6 @@ private struct DaySection: View {
         .environmentObject(AuthViewModel())
         .environmentObject(ExpenseViewModel())
         .environmentObject(SubscriptionManager.shared)
+        .environmentObject(NotificationManager.shared)
+        .environmentObject(RatingManager.shared)
 }

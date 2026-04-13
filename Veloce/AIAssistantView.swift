@@ -63,6 +63,19 @@ struct AIAssistantView: View {
         .background(VeloceTheme.accentBg)
     }
 
+    /// True while there are no user messages yet — show pre-filled suggestion chips.
+    private var showSuggestions: Bool {
+        !messages.isEmpty && !messages.contains(where: { $0.role == .user })
+    }
+
+    private let suggestions = [
+        "How can I save more this month?",
+        "Why did I overspend?",
+        "Give me budget tips",
+        "Which category costs me the most?",
+        "Am I on track with my saving goal?",
+    ]
+
     // MARK: - Message List
 
     private var messageList: some View {
@@ -73,6 +86,12 @@ struct AIAssistantView: View {
                         MessageBubble(message: msg)
                             .id(msg.id)
                     }
+                    // Suggestion chips — shown before the first user message
+                    if showSuggestions {
+                        suggestionChips
+                            .id("suggestions")
+                            .transition(.opacity.combined(with: .move(edge: .bottom)))
+                    }
                     if isThinking {
                         ThinkingBubble()
                             .id("thinking")
@@ -80,6 +99,7 @@ struct AIAssistantView: View {
                 }
                 .padding(.horizontal, 16)
                 .padding(.vertical, 16)
+                .animation(.easeInOut(duration: 0.2), value: showSuggestions)
             }
             .onChange(of: messages.count) { _, _ in
                 withAnimation(.easeOut(duration: 0.3)) {
@@ -94,6 +114,37 @@ struct AIAssistantView: View {
                 }
             }
         }
+    }
+
+    // MARK: - Suggestion Chips
+
+    private var suggestionChips: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Suggested questions")
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(VeloceTheme.textTertiary)
+                .padding(.horizontal, 2)
+
+            FlowLayout(spacing: 8) {
+                ForEach(suggestions, id: \.self) { prompt in
+                    Button(action: { sendSuggestion(prompt) }) {
+                        Text(prompt)
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundStyle(VeloceTheme.accent)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 7)
+                            .background(VeloceTheme.accentBg, in: Capsule())
+                            .overlay(Capsule().strokeBorder(VeloceTheme.accent.opacity(0.25), lineWidth: 1))
+                    }
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func sendSuggestion(_ text: String) {
+        inputText = text
+        sendMessage()
     }
 
     // MARK: - Input Bar

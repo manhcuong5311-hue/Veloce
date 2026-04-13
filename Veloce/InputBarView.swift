@@ -78,9 +78,6 @@ struct InputBarView: View {
     private var inputRow: some View {
         HStack(spacing: 8) {
 
-            // ── AI button (always left) ──────────────────────────
-            aiButton
-
             // ── Text field ───────────────────────────────────────
             HStack(spacing: 8) {
                 TextField("Ăn phở 50k, Grab 30k…", text: $text)
@@ -126,21 +123,6 @@ struct InputBarView: View {
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
-    }
-
-    // MARK: - AI button
-
-    private var aiButton: some View {
-        Button(action: onAITap) {
-            ZStack {
-                Circle()
-                    .fill(VeloceTheme.accentBg)
-                    .frame(width: 44, height: 44)
-                Image(systemName: "sparkles")
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(VeloceTheme.accent)
-            }
-        }
     }
 
     private var sendButton: some View {

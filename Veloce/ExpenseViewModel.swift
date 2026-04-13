@@ -107,6 +107,19 @@ final class ExpenseViewModel: ObservableObject {
         adjustSpent(categoryId: expense.categoryId, delta: +expense.amount)
         highlight(expense.categoryId)
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+
+        // Notification: record log (streak tracking + smart suppression)
+        NotificationManager.shared.recordExpenseLogged()
+
+        // Notification: check budget threshold for the affected category
+        if let cat = categories.first(where: { $0.id == expense.categoryId }) {
+            NotificationManager.shared.checkBudgetThreshold(for: cat)
+        }
+
+        // Rating: record first transaction + evaluate prompt
+        RatingManager.shared.recordFirstTransaction()
+        RatingManager.shared.recordActiveDay()
+        RatingManager.shared.evaluateAfterPositiveAction()
     }
 
     func deleteExpense(_ expense: Expense) {
@@ -231,7 +244,7 @@ final class ExpenseViewModel: ObservableObject {
         let payload = try decoder.decode(VeloceExportData.self, from: data)
 
         // Recompute .spent from the imported expenses so totals are always consistent
-        var rebuilt = payload.categories.map { cat -> Category in
+        let rebuilt = payload.categories.map { cat -> Category in
             var c = cat
             c.spent = payload.expenses
                 .filter { $0.categoryId == cat.id }
@@ -268,6 +281,120 @@ final class ExpenseViewModel: ObservableObject {
 
     func category(for id: UUID) -> Category? {
         categories.first { $0.id == id }
+    }
+
+    // MARK: - Budget Constraint
+
+    /// Maximum total budget allowed by the saving target constraint.
+    /// Returns `.greatestFiniteMagnitude` when no income is set (unconstrained).
+    var maxAllowedTotalBudget: Double {
+        guard monthlyIncome > 0 else { return .greatestFiniteMagnitude }
+        return max(0, monthlyIncome - savingGoal)
+    }
+
+    /// True when the current total budget exceeds the saving-target ceiling.
+    var isBudgetConstrainedBySavingTarget: Bool {
+        monthlyIncome > 0 && savingGoal > 0 && totalBudget > maxAllowedTotalBudget
+    }
+
+    /// Derived balance: income minus actual spending (never stored).
+    var currentBalance: Double { monthlyIncome - totalSpent }
+
+    /// Remaining budget ceiling after subtracting saving target and allocated budgets.
+    var unallocatedBudgetAllowance: Double {
+        guard monthlyIncome > 0 else { return 0 }
+        return monthlyIncome - savingGoal - totalBudget
+    }
+
+    // MARK: - Monthly Insights
+
+    struct MonthlyInsight {
+        let monthStart: Date
+        let totalSpent: Double
+        let income: Double
+        let byCategory: [UUID: Double]   // categoryId → amount spent
+
+        var totalSaved: Double { max(0, income - totalSpent) }
+        var savingRate: Double { income > 0 ? totalSaved / income * 100 : 0 }
+
+        var shortLabel: String {
+            let f = DateFormatter()
+            f.dateFormat = "MMM"
+            f.locale = Locale(identifier: "en_US")
+            return f.string(from: monthStart)
+        }
+
+        var fullLabel: String {
+            let f = DateFormatter()
+            f.dateFormat = "MMMM yyyy"
+            f.locale = Locale(identifier: "en_US")
+            return f.string(from: monthStart)
+        }
+    }
+
+    /// Returns the last `count` months of spending data, oldest first.
+    func monthlyInsights(count: Int = 6) -> [MonthlyInsight] {
+        let cal = Calendar.current
+        let now = Date()
+        return (0..<count).reversed().compactMap { offset -> MonthlyInsight? in
+            guard let monthDate  = cal.date(byAdding: .month, value: -offset, to: now),
+                  let monthStart = cal.date(from: cal.dateComponents([.year, .month], from: monthDate)),
+                  let monthEnd   = cal.date(byAdding: .month, value: 1, to: monthStart)
+            else { return nil }
+
+            let monthExpenses = expenses.filter { $0.date >= monthStart && $0.date < monthEnd }
+            let totalSpent    = monthExpenses.reduce(0) { $0 + $1.amount }
+            var byCat: [UUID: Double] = [:]
+            for e in monthExpenses { byCat[e.categoryId, default: 0] += e.amount }
+
+            return MonthlyInsight(
+                monthStart: monthStart,
+                totalSpent: totalSpent,
+                income: monthlyIncome,
+                byCategory: byCat
+            )
+        }
+    }
+
+    /// Current calendar month insight (always present, may have zero spending).
+    var currentMonthInsight: MonthlyInsight {
+        monthlyInsights(count: 1).last
+            ?? MonthlyInsight(monthStart: Date(), totalSpent: 0, income: monthlyIncome, byCategory: [:])
+    }
+
+    // MARK: - Yearly Insights
+
+    struct YearlyInsight {
+        let year: Int
+        let totalSpent: Double
+        let totalSaved: Double
+        let months: [ExpenseViewModel.MonthlyInsight]   // non-empty months
+
+        var monthlyAverage: Double {
+            let nonEmpty = months.filter { $0.totalSpent > 0 }
+            guard !nonEmpty.isEmpty else { return 0 }
+            return totalSpent / Double(nonEmpty.count)
+        }
+
+        var bestMonth: ExpenseViewModel.MonthlyInsight? {
+            months.filter { $0.income > 0 }.max { $0.savingRate < $1.savingRate }
+        }
+
+        var worstMonth: ExpenseViewModel.MonthlyInsight? {
+            months.filter { $0.totalSpent > 0 }.max { $0.totalSpent < $1.totalSpent }
+        }
+    }
+
+    /// Year-to-date aggregated insight for the current calendar year.
+    var yearlyInsight: YearlyInsight {
+        let cal  = Calendar.current
+        let year = cal.component(.year, from: Date())
+        let all  = monthlyInsights(count: 12).filter {
+            cal.component(.year, from: $0.monthStart) == year
+        }
+        let totalSpent = all.reduce(0) { $0 + $1.totalSpent }
+        let totalSaved = all.reduce(0) { $0 + $1.totalSaved }
+        return YearlyInsight(year: year, totalSpent: totalSpent, totalSaved: totalSaved, months: all)
     }
 
     // MARK: Private helpers
