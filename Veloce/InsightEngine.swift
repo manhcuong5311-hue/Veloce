@@ -148,10 +148,11 @@ struct InsightEngine {
             priority:          .risk,
             kind:              .anomaly,
             icon:              "bolt.fill",
-            title:             "Spending spike today",
+            title:             String(localized: "insight_anomaly_title"),
             keyNumber:         todayTotal.toCompactCurrency(),
-            detail:            "You spent \(todayTotal.toCompactCurrency()) today — \(String(format: "%.1f", multiple))× your recent daily average (\(recentAvg.toCompactCurrency())/day).",
-            action:            "Review today's transactions",
+            detail:            String(format: String(localized: "insight_anomaly_detail_fmt"),
+                                      todayTotal.toCompactCurrency(), multiple, recentAvg.toCompactCurrency()),
+            action:            String(localized: "insight_anomaly_action"),
             aiPrompt:          "I spent \(todayTotal.toCompactCurrency()) today — \(String(format: "%.1f", multiple))× my usual daily average of \(recentAvg.toCompactCurrency()). What happened and how should I adjust?",
             hexColor:          "E88A7A",
             relatedCategoryId: nil
@@ -182,21 +183,25 @@ struct InsightEngine {
 
         let detail: String
         if projectedSaving < 0 {
-            detail = "At this pace you'd overspend by \((-projectedSaving).toCompactCurrency()). Cut \(dailyCut.toCompactCurrency())/day to recover."
+            detail = String(format: String(localized: "insight_forecast_overspend_detail_fmt"),
+                            (-projectedSaving).toCompactCurrency(), dailyCut.toCompactCurrency())
         } else if isOnTrack {
-            detail = "At this rate you'll save \(projectedSaving.toCompactCurrency()) — right on target (\(savingGoal.toCompactCurrency()) goal). Keep it up!"
+            detail = String(format: String(localized: "insight_forecast_ontrack_detail_fmt"),
+                            projectedSaving.toCompactCurrency(), savingGoal.toCompactCurrency())
         } else {
-            detail = "At this rate you'll save \(projectedSaving.toCompactCurrency()) — \(shortfall.toCompactCurrency()) short of your \(savingGoal.toCompactCurrency()) goal. Spend \(dailyCut.toCompactCurrency()) less per day to hit it."
+            detail = String(format: String(localized: "insight_forecast_shortfall_detail_fmt"),
+                            projectedSaving.toCompactCurrency(), shortfall.toCompactCurrency(),
+                            savingGoal.toCompactCurrency(), dailyCut.toCompactCurrency())
         }
 
         return InsightCard(
             priority:          isOnTrack ? .opportunity : .risk,
             kind:              .forecast,
             icon:              isOnTrack ? "chart.line.uptrend.xyaxis" : "exclamationmark.triangle.fill",
-            title:             isOnTrack ? "On track to meet goal" : "Saving goal at risk",
+            title:             isOnTrack ? String(localized: "insight_forecast_ontrack_title") : String(localized: "insight_forecast_atrisk_title"),
             keyNumber:         max(0, projectedSaving).toCompactCurrency(),
             detail:            detail,
-            action:            isOnTrack ? nil : "Spend \(dailyCut.toCompactCurrency()) less per day",
+            action:            isOnTrack ? nil : String(format: String(localized: "insight_forecast_atrisk_action_fmt"), dailyCut.toCompactCurrency()),
             aiPrompt:          "My projected end-of-month savings is \(max(0, projectedSaving).toCompactCurrency()) and my goal is \(savingGoal.toCompactCurrency()). What should I cut to stay on track?",
             hexColor:          isOnTrack ? "6BBF8E" : "E8B86D",
             relatedCategoryId: nil
@@ -230,10 +235,11 @@ struct InsightEngine {
                 priority:          .opportunity,
                 kind:              .categorySpike,
                 icon:              "arrow.up.right.circle.fill",
-                title:             "\(cat.name) up \(String(format: "%.0f", pct))% vs last month",
+                title:             String(format: String(localized: "insight_catspike_title_fmt"), cat.name, pct),
                 keyNumber:         "+\(delta.toCompactCurrency())",
-                detail:            "\(cat.name) cost \(cur.toCompactCurrency()) this month vs \(prev.toCompactCurrency()) last month. Cutting back 20% would save ~\(save20.toCompactCurrency()).",
-                action:            "Cut \(cat.name) 20% → save \(save20.toCompactCurrency())",
+                detail:            String(format: String(localized: "insight_catspike_detail_fmt"),
+                                          cat.name, cur.toCompactCurrency(), prev.toCompactCurrency(), save20.toCompactCurrency()),
+                action:            String(format: String(localized: "insight_catspike_action_fmt"), cat.name, save20.toCompactCurrency()),
                 aiPrompt:          "My \(cat.name) spending jumped \(String(format: "%.0f", pct))% vs last month (+\(delta.toCompactCurrency())). What's driving this and how can I reduce it?",
                 hexColor:          cat.colorHex,
                 relatedCategoryId: cat.id
@@ -268,10 +274,10 @@ struct InsightEngine {
                 priority:          .opportunity,
                 kind:              .consecutiveTrend,
                 icon:              "arrow.up.right.square.fill",
-                title:             "\(cat.name) rising for \(months) months",
-                keyNumber:         "\(months) months",
-                detail:            "\(cat.name) spending has increased each month for \(months) months in a row. This pattern suggests a habit worth reviewing before it compounds.",
-                action:            "Review \(cat.name) spending habit",
+                title:             String(format: String(localized: "insight_trend_title_fmt"), cat.name, months),
+                keyNumber:         "\(months)",
+                detail:            String(format: String(localized: "insight_trend_detail_fmt"), cat.name, months),
+                action:            String(format: String(localized: "insight_trend_action_fmt"), cat.name),
                 aiPrompt:          "My \(cat.name) spending has been rising for \(months) consecutive months. Help me understand why and how to break the trend.",
                 hexColor:          cat.colorHex,
                 relatedCategoryId: cat.id
@@ -297,12 +303,15 @@ struct InsightEngine {
             priority:          isAhead ? .opportunity : .informational,
             kind:              .saving,
             icon:              isAhead ? "leaf.fill" : "target",
-            title:             isAhead ? "Saving goal secured!" : "Saving goal progress",
+            title:             isAhead ? String(localized: "insight_saving_secured_title") : String(localized: "insight_saving_progress_title"),
             keyNumber:         String(format: "%.0f%%", max(0, pct)),
             detail:            isAhead
-                ? "You've already secured \(remaining.toCompactCurrency()) — \(String(format: "%.0f", pct))% of your \(savingGoal.toCompactCurrency()) goal, with money still available to spend."
-                : "You're at \(String(format: "%.0f", pct))% of your \(savingGoal.toCompactCurrency()) saving target. Spend at most \((income - savingGoal).toCompactCurrency()) total to hit it.",
-            action:            isAhead ? nil : "Stay under \((income - savingGoal).toCompactCurrency()) total",
+                ? String(format: String(localized: "insight_saving_secured_detail_fmt"),
+                          remaining.toCompactCurrency(), pct, savingGoal.toCompactCurrency())
+                : String(format: String(localized: "insight_saving_progress_detail_fmt"),
+                          pct, savingGoal.toCompactCurrency(), (income - savingGoal).toCompactCurrency()),
+            action:            isAhead ? nil : String(format: String(localized: "insight_saving_progress_action_fmt"),
+                                                      (income - savingGoal).toCompactCurrency()),
             aiPrompt:          "I'm at \(String(format: "%.0f", pct))% of my \(savingGoal.toCompactCurrency()) monthly saving goal. What's the best strategy to reach it?",
             hexColor:          isAhead ? "6BBF8E" : "7B6CF0",
             relatedCategoryId: nil
@@ -336,10 +345,11 @@ struct InsightEngine {
             priority:          .opportunity,
             kind:              .behavioral,
             icon:              "calendar.badge.plus",
-            title:             "Weekend spending \(String(format: "%.0f%%", (ratio - 1) * 100)) higher",
+            title:             String(format: String(localized: "insight_weekend_title_fmt"), (ratio - 1) * 100),
             keyNumber:         String(format: "×%.1f", ratio),
-            detail:            "You spend \(weekendAvg.toCompactCurrency())/day on weekends vs \(weekdayAvg.toCompactCurrency())/day on weekdays — \(String(format: "%.1f", ratio))× more. Weekend habits have an outsized impact on monthly totals.",
-            action:            "Set a weekend daily spending limit",
+            detail:            String(format: String(localized: "insight_weekend_detail_fmt"),
+                                      weekendAvg.toCompactCurrency(), weekdayAvg.toCompactCurrency(), ratio),
+            action:            String(localized: "insight_weekend_action"),
             aiPrompt:          "I spend \(String(format: "%.1f", ratio))× more on weekends (\(weekendAvg.toCompactCurrency())/day) than weekdays (\(weekdayAvg.toCompactCurrency())/day). How can I close this gap?",
             hexColor:          "E8B86D",
             relatedCategoryId: nil
@@ -381,9 +391,10 @@ struct InsightEngine {
             priority:          .informational,
             kind:              .streak,
             icon:              "flame.fill",
-            title:             "\(streak)-day budget streak",
-            keyNumber:         "\(streak) days",
-            detail:            "You've been under your daily budget of \(dailyBudget.toCompactCurrency()) for \(streak) consecutive days. Outstanding discipline!",
+            title:             String(format: String(localized: "insight_streak_title_fmt"), streak),
+            keyNumber:         "\(streak)",
+            detail:            String(format: String(localized: "insight_streak_detail_fmt"),
+                                      dailyBudget.toCompactCurrency(), streak),
             action:            nil,
             aiPrompt:          "I've spent under budget for \(streak) days in a row. How do I maintain this momentum?",
             hexColor:          "E07A5F",
@@ -417,9 +428,13 @@ struct InsightEngine {
             priority:          .informational,
             kind:              .weekly,
             icon:              "calendar.badge.checkmark",
-            title:             "This week vs last week",
+            title:             String(localized: "insight_weekly_title"),
             keyNumber:         thisWeek.toCompactCurrency(),
-            detail:            "You spent \(thisWeek.toCompactCurrency()) this week — \(isUp ? "up" : "down") \(String(format: "%.0f%%", pct)) from \(lastWeek.toCompactCurrency()) last week.",
+            detail:            isUp
+                ? String(format: String(localized: "insight_weekly_detail_up_fmt"),
+                          thisWeek.toCompactCurrency(), pct, lastWeek.toCompactCurrency())
+                : String(format: String(localized: "insight_weekly_detail_down_fmt"),
+                          thisWeek.toCompactCurrency(), pct, lastWeek.toCompactCurrency()),
             action:            nil,
             aiPrompt:          "I spent \(thisWeek.toCompactCurrency()) this week vs \(lastWeek.toCompactCurrency()) last week (\(isUp ? "+" : "-")\(String(format: "%.0f%%", pct))). Is this a concerning trend?",
             hexColor:          "5B8DB8",
@@ -449,10 +464,11 @@ struct InsightEngine {
             priority:          .informational,
             kind:              .micro,
             icon:              "lightbulb.fill",
-            title:             "Quick win: reduce \(cat.name) 10%",
+            title:             String(format: String(localized: "insight_micro_title_fmt"), cat.name),
             keyNumber:         reduce10.toCompactCurrency(),
-            detail:            "Cutting \(cat.name) by just 10% (\(reduce10.toCompactCurrency())/month) saves \(yearly.toCompactCurrency()) a year — only \(perDay.toCompactCurrency()) less per day.",
-            action:            "Set a lower \(cat.name) budget",
+            detail:            String(format: String(localized: "insight_micro_detail_fmt"),
+                                      cat.name, reduce10.toCompactCurrency(), yearly.toCompactCurrency(), perDay.toCompactCurrency()),
+            action:            String(format: String(localized: "insight_micro_action_fmt"), cat.name),
             aiPrompt:          "Help me reduce my \(cat.name) spending by 10%. What specific things can I cut?",
             hexColor:          cat.colorHex,
             relatedCategoryId: cat.id

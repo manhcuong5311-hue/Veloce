@@ -164,7 +164,7 @@ private struct SummaryHeaderView: View {
     private var monthYear: String {
         let f = DateFormatter()
         f.dateFormat = "MMMM yyyy"
-        f.locale = Locale(identifier: "en_US")
+        f.locale = Locale.current
         return f.string(from: Date())
     }
 
@@ -184,7 +184,7 @@ private struct SummaryHeaderView: View {
                     .contentTransition(.numericText())
                     .animation(.spring(response: 0.4), value: vm.totalSpent)
 
-                Text("spent")
+                Text("spent_label")
                     .font(.system(size: 15))
                     .foregroundStyle(VeloceTheme.textSecondary)
                     .offset(y: -2)
@@ -208,14 +208,14 @@ private struct SummaryHeaderView: View {
                 HStack {
                     let rem = vm.totalBudget - vm.totalSpent
                     Text(rem >= 0
-                         ? "\(rem.toCompactCurrency()) remaining"
-                         : "Over by \((-rem).toCompactCurrency())")
+                         ? String(format: String(localized: "budget_remaining_fmt"), rem.toCompactCurrency())
+                         : String(format: String(localized: "budget_over_fmt"), (-rem).toCompactCurrency()))
                         .font(.system(size: 12, weight: .medium))
                         .foregroundStyle(rem >= 0 ? VeloceTheme.ok : VeloceTheme.over)
 
                     Spacer()
 
-                    Text("of \(vm.totalBudget.toCompactCurrency())")
+                    Text(String(format: String(localized: "budget_of_total_fmt"), vm.totalBudget.toCompactCurrency()))
                         .font(.system(size: 12))
                         .foregroundStyle(VeloceTheme.textTertiary)
                 }
@@ -403,7 +403,8 @@ private struct ColumnsCard: View {
             }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("Your total budget is constrained by your saving target (\(vm.savingGoal.toCompactCurrency())). Reduce the saving target in Settings to allocate more budget.")
+            Text(String(format: String(localized: "budget_constraint_alert_fmt"),
+                        vm.savingGoal.toCompactCurrency()))
         }
     }
 
@@ -513,8 +514,8 @@ private struct ColumnsCard: View {
                             .fill(remainingBudget < 0 ? VeloceTheme.over : VeloceTheme.ok)
                             .frame(width: 5, height: 5)
                         Text(remainingBudget < 0
-                             ? "\((-remainingBudget).toCompactCurrency()) over"
-                             : "\(remainingBudget.toCompactCurrency()) remaining")
+                             ? String(format: String(localized: "edit_pool_over_fmt"), (-remainingBudget).toCompactCurrency())
+                             : String(format: String(localized: "edit_pool_remaining_fmt"), remainingBudget.toCompactCurrency()))
                             .font(.system(size: 12, weight: .medium, design: .rounded))
                             .foregroundStyle(remainingBudget < 0
                                              ? VeloceTheme.over
@@ -656,16 +657,16 @@ private struct ColumnsCard: View {
                     Image(systemName: isWithin ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
                         .font(.system(size: 10))
                     Text(isWithin
-                         ? "Saving target reserved: \(String(format: "%.0f", savingsPct))%"
-                         : "Budget exceeds saving target ceiling by \((-unallocated).toCompactCurrency())")
+                         ? String(format: String(localized: "saving_target_reserved_pct_fmt"), savingsPct)
+                         : String(format: String(localized: "budget_exceeds_ceiling_fmt"), (-unallocated).toCompactCurrency()))
                         .font(.system(size: 11, weight: .medium))
                 } else {
                     let pct = income > 0 ? max(0, income - budget) / income * 100 : 0
                     Image(systemName: budget <= income ? "leaf.fill" : "exclamationmark.triangle.fill")
                         .font(.system(size: 10))
                     Text(budget <= income
-                         ? "Saving \(String(format: "%.0f", pct))% of income"
-                         : "Over income by \(String(format: "%.0f", income > 0 ? (budget-income)/income*100 : 0))%")
+                         ? String(format: String(localized: "saving_income_pct_fmt"), pct)
+                         : String(format: String(localized: "over_income_pct_fmt"), income > 0 ? (budget-income)/income*100 : 0))
                         .font(.system(size: 11, weight: .medium))
                 }
             }

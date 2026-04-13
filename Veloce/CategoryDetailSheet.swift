@@ -13,10 +13,11 @@ struct CategoryDetailSheet: View {
         self._currentId = State(initialValue: category.id)
     }
 
-    @State private var editingBudget  = false
-    @State private var budgetInput    = ""
-    @State private var editingExpense: Expense? = nil
-    @State private var showPaywall    = false
+    @State private var editingBudget           = false
+    @State private var budgetInput             = ""
+    @State private var editingExpense:         Expense? = nil
+    @State private var showPaywall             = false
+    @State private var showBudgetConstraintAlert = false
 
     private let budgetPresets: [(label: String, value: Double)] = [
         ("500K",   500_000),
@@ -84,6 +85,12 @@ struct CategoryDetailSheet: View {
         .sheet(isPresented: $showPaywall) {
             PaywallView().environmentObject(subManager)
         }
+        .alert("Can't Update Budget", isPresented: $showBudgetConstraintAlert) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(String(format: String(localized: "budget_constraint_alert_fmt"),
+                        vm.savingGoal.toCompactCurrency()))
+        }
     }
 
     // MARK: - Header
@@ -103,7 +110,10 @@ struct CategoryDetailSheet: View {
                 Text(live.name)
                     .font(.system(size: 22, weight: .bold))
                     .foregroundStyle(VeloceTheme.textPrimary)
-                Text("\(vm.expenses(for: live.id).count) transactions this month")
+                let monthCount = vm.expenses(for: live.id).filter {
+                    Calendar.current.isDate($0.date, equalTo: Date(), toGranularity: .month)
+                }.count
+                Text(String(format: String(localized: "category_txns_this_month_fmt"), monthCount))
                     .font(.system(size: 13))
                     .foregroundStyle(VeloceTheme.textSecondary)
             }
@@ -364,9 +374,19 @@ struct CategoryDetailSheet: View {
 
     private func saveBudget() {
         let cleaned = budgetInput.filter { $0.isNumber }
-        if let val = Double(cleaned), val > 0 {
-            vm.updateBudget(categoryId: live.id, newBudget: val)
+        guard let val = Double(cleaned), val > 0 else {
+            withAnimation(.spring(response: 0.3)) { editingBudget = false }
+            return
         }
+        // Enforce saving-target constraint: new total must not exceed salary − saving target.
+        if vm.monthlyIncome > 0 {
+            let proposedTotal = vm.totalBudget - live.budget + val
+            if proposedTotal > vm.maxAllowedTotalBudget {
+                showBudgetConstraintAlert = true
+                return
+            }
+        }
+        vm.updateBudget(categoryId: live.id, newBudget: val)
         withAnimation(.spring(response: 0.3)) { editingBudget = false }
     }
 }

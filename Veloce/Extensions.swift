@@ -275,14 +275,14 @@ extension Date {
     func toRelativeDateString() -> String {
         let cal = Calendar.current
         let f = DateFormatter()
-        f.locale = Locale(identifier: "en_US")
+        f.locale = Locale.current
         if cal.isDateInToday(self) {
             f.dateFormat = "HH:mm"
             return f.string(from: self)
         }
         if cal.isDateInYesterday(self) {
             f.dateFormat = "HH:mm"
-            return "Yesterday · \(f.string(from: self))"
+            return String(format: String(localized: "date_yesterday_time_fmt"), f.string(from: self))
         }
         f.dateFormat = "dd/MM · HH:mm"
         return f.string(from: self)
@@ -297,9 +297,9 @@ extension Date {
     var dayBucket: String {
         let cal = Calendar.current
         let f = DateFormatter()
-        f.locale = Locale(identifier: "en_US")
-        if cal.isDateInToday(self)     { return "Today" }
-        if cal.isDateInYesterday(self) { return "Yesterday" }
+        f.locale = Locale.current
+        if cal.isDateInToday(self)     { return String(localized: "date_today") }
+        if cal.isDateInYesterday(self) { return String(localized: "date_yesterday") }
         f.dateFormat = "EEEE, d MMM"
         return f.string(from: self)
     }

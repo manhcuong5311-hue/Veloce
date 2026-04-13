@@ -268,7 +268,20 @@ final class ExpenseViewModel: ObservableObject {
     // MARK: AI
 
     func insight(for category: Category) -> AIInsight? {
-        AIService.generateInsight(for: category, previousSpent: category.spent * 0.72)
+        // Compute actual previous-month spending instead of the fake 0.72 multiplier.
+        let cal = Calendar.current
+        let now = Date()
+        let previousSpent: Double
+        if let prevMonthDate  = cal.date(byAdding: .month, value: -1, to: now),
+           let prevMonthStart = cal.date(from: cal.dateComponents([.year, .month], from: prevMonthDate)),
+           let prevMonthEnd   = cal.date(byAdding: .month, value: 1, to: prevMonthStart) {
+            previousSpent = expenses
+                .filter { $0.categoryId == category.id && $0.date >= prevMonthStart && $0.date < prevMonthEnd }
+                .reduce(0) { $0 + $1.amount }
+        } else {
+            previousSpent = 0
+        }
+        return AIService.generateInsight(for: category, previousSpent: previousSpent)
     }
 
     func monthlyAdvice() -> [AIAdvice] {
@@ -320,14 +333,14 @@ final class ExpenseViewModel: ObservableObject {
         var shortLabel: String {
             let f = DateFormatter()
             f.dateFormat = "MMM"
-            f.locale = Locale(identifier: "en_US")
+            f.locale = Locale.current
             return f.string(from: monthStart)
         }
 
         var fullLabel: String {
             let f = DateFormatter()
             f.dateFormat = "MMMM yyyy"
-            f.locale = Locale(identifier: "en_US")
+            f.locale = Locale.current
             return f.string(from: monthStart)
         }
     }
@@ -433,12 +446,28 @@ final class ExpenseViewModel: ObservableObject {
     init() {
         let store = PersistenceStore.shared
 
-        // Load persisted state (or fall back to defaults)
-        // Use underscore form to bypass @Published setter during init
-        self.categories     = store.loadCategories() ?? Self.defaultCategories()
-        self.expenses       = store.loadExpenses()   ?? []
-        _monthlyIncome      = Published(wrappedValue: store.loadMonthlyIncome())
-        _savingGoal         = Published(wrappedValue: store.loadSavingGoal())
+        let loadedExpenses  = store.loadExpenses() ?? []
+        let rawCategories   = store.loadCategories() ?? Self.defaultCategories()
+
+        // Always recompute .spent from the live expense list so crash-diverged
+        // totals are corrected on the next launch (same logic as importJSON).
+        let reconciledCategories = rawCategories.map { cat -> Category in
+            var c = cat
+            c.spent = loadedExpenses
+                .filter { $0.categoryId == cat.id }
+                .reduce(0) { $0 + $1.amount }
+            return c
+        }
+
+        self.categories = reconciledCategories
+        self.expenses   = loadedExpenses
+        _monthlyIncome  = Published(wrappedValue: store.loadMonthlyIncome())
+        _savingGoal     = Published(wrappedValue: store.loadSavingGoal())
+
+        // Persist reconciled categories immediately if they diverged from stored state.
+        if reconciledCategories != rawCategories {
+            store.saveCategories(reconciledCategories)
+        }
 
         // Auto-save whenever published properties change (debounced 400 ms)
         $categories

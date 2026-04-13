@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		0DBF8C212F8D01ED006F54F6 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = 0DBF8C202F8D01ED006F54F6 /* Localizable.xcstrings */; };
 		0DC20BB12F88BDF400AE2A1E /* FirebaseCore in Frameworks */ = {isa = PBXBuildFile; productRef = 0DC20BB02F88BDF400AE2A1E /* FirebaseCore */; };
 		0DC20BB32F88BDF400AE2A1E /* FirebaseFirestore in Frameworks */ = {isa = PBXBuildFile; productRef = 0DC20BB22F88BDF400AE2A1E /* FirebaseFirestore */; };
 		0DC20BB52F88BDF400AE2A1E /* FirebaseFunctions in Frameworks */ = {isa = PBXBuildFile; productRef = 0DC20BB42F88BDF400AE2A1E /* FirebaseFunctions */; };
@@ -15,6 +16,7 @@
 
 /* Begin PBXFileReference section */
 		0D8CE8A02F874FC200309833 /* Veloce.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Veloce.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		0DBF8C202F8D01ED006F54F6 /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -56,6 +58,7 @@
 		0D8CE8972F874FC200309833 = {
 			isa = PBXGroup;
 			children = (
+				0DBF8C202F8D01ED006F54F6 /* Localizable.xcstrings */,
 				0D8CE8A22F874FC200309833 /* Veloce */,
 				0D8CE8A12F874FC200309833 /* Products */,
 			);
@@ -119,6 +122,7 @@
 			knownRegions = (
 				en,
 				Base,
+				vi,
 			);
 			mainGroup = 0D8CE8972F874FC200309833;
 			minimizedProjectReferenceProxies = 1;
@@ -140,6 +144,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				0DBF8C212F8D01ED006F54F6 /* Localizable.xcstrings in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -216,6 +221,7 @@
 				ONLY_ACTIVE_ARCH = YES;
 				SDKROOT = iphoneos;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 			};
 			name = Debug;
@@ -273,6 +279,7 @@
 				MTL_FAST_MATH = YES;
 				SDKROOT = iphoneos;
 				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_EMIT_LOC_STRINGS = YES;
 				VALIDATE_PRODUCT = YES;
 			};
 			name = Release;

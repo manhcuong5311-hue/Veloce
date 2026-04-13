@@ -234,7 +234,7 @@ struct SettingsView: View {
         } header: {
             sectionHeader("General", icon: "slider.horizontal.3")
         } footer: {
-            Text("Set your salary and saving goal for AI-powered insights and budget recommendations.")
+            Text("settings_general_footer")
                 .font(.system(size: 12))
                 .foregroundStyle(VeloceTheme.textTertiary)
         }
@@ -353,7 +353,7 @@ struct SettingsView: View {
             sectionHeader("Premium", icon: "star.circle.fill")
         } footer: {
             if !subManager.isProUser {
-                Text("Premium unlocks unlimited AI (50/day), data export/import, icon & color customization, and more.")
+                Text("settings_premium_footer")
                     .font(.system(size: 12))
                     .foregroundStyle(VeloceTheme.textTertiary)
             }
@@ -537,7 +537,7 @@ struct SettingsView: View {
                     Text("🔥")
                         .font(.system(size: 20))
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("You're on a \(notifMgr.dailyStreak)-day streak!")
+                        Text(String(format: String(localized: "streak_label_fmt"), notifMgr.dailyStreak))
                             .font(.system(size: 14, weight: .semibold))
                             .foregroundStyle(VeloceTheme.textPrimary)
                         Text("Keep logging expenses daily to maintain it")
@@ -588,13 +588,13 @@ struct SettingsView: View {
         } footer: {
             switch notifMgr.authStatus {
             case .authorized:
-                Text("Notifications are enabled. Veloce will remind you to log expenses and alert you when budgets are nearly full.")
+                Text("settings_notif_authorized_footer")
                     .font(.system(size: 12)).foregroundStyle(VeloceTheme.textTertiary)
             case .denied:
-                Text("Enable notifications in System Settings to receive reminders and budget alerts.")
+                Text("settings_notif_denied_footer")
                     .font(.system(size: 12)).foregroundStyle(VeloceTheme.textTertiary)
             default:
-                Text("Allow notifications to get daily reminders and smart budget alerts.")
+                Text("settings_notif_default_footer")
                     .font(.system(size: 12)).foregroundStyle(VeloceTheme.textTertiary)
             }
         }
@@ -634,9 +634,7 @@ struct SettingsView: View {
         } header: {
             sectionHeader("Data", icon: "externaldrive")
         } footer: {
-            Text(subManager.isProUser
-                 ? "Full JSON backup of your expenses, budgets, and categories."
-                 : "Export and import require Premium.")
+            Text(subManager.isProUser ? "settings_data_pro_footer" : "settings_data_free_footer")
                 .font(.system(size: 12))
                 .foregroundStyle(VeloceTheme.textTertiary)
         }

@@ -62,14 +62,16 @@ final class NotificationManager: NSObject, ObservableObject {
 
     // MARK: Content
 
-    private let dailyMessages = [
-        "Did you log your spending today?",
-        "Quick check: any expenses to add?",
-        "Stay consistent — log today's spending in 10 seconds.",
-        "Don't forget today's expenses 💡",
-        "A quick log keeps your budget on track.",
-        "You're on a roll — keep your spending log updated 🚀",
-    ]
+    private var dailyMessages: [String] {
+        [
+            String(localized: "notif_daily_1"),
+            String(localized: "notif_daily_2"),
+            String(localized: "notif_daily_3"),
+            String(localized: "notif_daily_4"),
+            String(localized: "notif_daily_5"),
+            String(localized: "notif_daily_6"),
+        ]
+    }
 
     // MARK: Init
 
@@ -179,7 +181,7 @@ final class NotificationManager: NSObject, ObservableObject {
         guard authStatus == .authorized else { return }
         let content   = UNMutableNotificationContent()
         content.title = "Veloce 🔥"
-        content.body  = "You've logged expenses \(streak) days in a row. Keep it up!"
+        content.body  = String(format: String(localized: "notif_streak_body_fmt"), streak)
         content.sound = .default
         let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 3, repeats: false)
         let request = UNNotificationRequest(
@@ -218,14 +220,14 @@ final class NotificationManager: NSObject, ObservableObject {
         content.sound = .default
         switch t {
         case .half:
-            content.title = "Halfway there"
-            content.body  = "You're halfway through your \(category.name) budget this month."
+            content.title = String(localized: "notif_budget_half_title")
+            content.body  = String(format: String(localized: "notif_budget_half_body_fmt"), category.name)
         case .warning:
-            content.title = "Budget alert"
-            content.body  = "Careful — you're close to your \(category.name) limit."
+            content.title = String(localized: "notif_budget_warning_title")
+            content.body  = String(format: String(localized: "notif_budget_warning_body_fmt"), category.name)
         case .exceeded:
-            content.title = "Budget exceeded"
-            content.body  = "You've exceeded your \(category.name) budget."
+            content.title = String(localized: "notif_budget_exceeded_title")
+            content.body  = String(format: String(localized: "notif_budget_exceeded_body_fmt"), category.name)
         }
 
         let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 1, repeats: false)
@@ -252,7 +254,7 @@ final class NotificationManager: NSObject, ObservableObject {
         guard authStatus == .authorized else { return }
         let content       = UNMutableNotificationContent()
         content.title     = "Veloce"
-        content.body      = "Notifications are working correctly. You're all set!"
+        content.body      = String(localized: "notif_test_body")
         content.sound     = .default
         let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 2, repeats: false)
         let request = UNNotificationRequest(

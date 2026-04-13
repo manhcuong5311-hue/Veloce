@@ -28,23 +28,23 @@ enum AIService {
 
         if ratio > 1.0 {
             let over = (category.spent - category.budget).toCompactCurrency()
-            return AIInsight(message: "Over budget by \(over) this month", kind: .alert)
+            return AIInsight(message: String(format: String(localized: "ai_insight_over_budget_fmt"), over), kind: .alert)
         }
         if ratio > 0.85 {
             let left = category.remainingBudget.toCompactCurrency()
-            return AIInsight(message: "Only \(left) left — almost at limit", kind: .warning)
+            return AIInsight(message: String(format: String(localized: "ai_insight_near_limit_fmt"), left), kind: .warning)
         }
         if previousSpent > 0 {
             let growth = (category.spent - previousSpent) / previousSpent
             if growth > 0.3 {
-                return AIInsight(message: "Spending is up \(Int(growth * 100))% vs last week", kind: .warning)
+                return AIInsight(message: String(format: String(localized: "ai_insight_up_pct_fmt"), Int(growth * 100)), kind: .warning)
             }
             if growth < -0.2 {
-                return AIInsight(message: "Down \(Int(abs(growth) * 100))% vs last week — nice!", kind: .positive)
+                return AIInsight(message: String(format: String(localized: "ai_insight_down_pct_fmt"), Int(abs(growth) * 100)), kind: .positive)
             }
         }
         if ratio < 0.25 && category.spent > 0 {
-            return AIInsight(message: "Well under budget — great discipline!", kind: .positive)
+            return AIInsight(message: String(localized: "ai_insight_well_under"), kind: .positive)
         }
         return nil
     }
@@ -62,7 +62,7 @@ enum AIService {
         guard surplus < savingGoal else {
             return [AIAdvice(
                 category: "Overview",
-                suggestion: "You're on track to meet your savings goal this month.",
+                suggestion: String(localized: "ai_advice_on_track"),
                 potentialSaving: 0
             )]
         }
@@ -75,13 +75,13 @@ enum AIService {
                 let cut = cat.spent * 0.2
                 return AIAdvice(
                     category: cat.name,
-                    suggestion: "Reduce \(cat.name) by 20% → save \(cut.toCompactCurrency())/month",
+                    suggestion: String(format: String(localized: "ai_advice_reduce_fmt"), cat.name, cut.toCompactCurrency()),
                     potentialSaving: cut
                 )
             }
 
         return candidates.isEmpty
-            ? [AIAdvice(category: "General", suggestion: "Try cutting discretionary spend by 15%.", potentialSaving: totalSpent * 0.15)]
+            ? [AIAdvice(category: "General", suggestion: String(localized: "ai_advice_cut_discretionary"), potentialSaving: totalSpent * 0.15)]
             : candidates
     }
 
