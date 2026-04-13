@@ -18,6 +18,8 @@ struct AIAssistantView: View {
     @EnvironmentObject var subManager: SubscriptionManager
     @Environment(\.dismiss) private var dismiss
 
+    var autoSendPrompt: String? = nil
+
     @State private var messages:  [ChatMessage] = []
     @State private var inputText  = ""
     @State private var isThinking = false
@@ -43,7 +45,13 @@ struct AIAssistantView: View {
         .presentationDetents([.large])
         .presentationBackground(VeloceTheme.bg)
         .preferredColorScheme(.light)
-        .onAppear { sendWelcome() }
+        .onAppear {
+            sendWelcome()
+            if let prompt = autoSendPrompt, !prompt.isEmpty {
+                inputText = prompt
+                sendMessage()
+            }
+        }
     }
 
     // MARK: - Usage Banner

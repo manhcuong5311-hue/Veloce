@@ -128,6 +128,7 @@ struct ContentView: View {
         .sheet(isPresented: $showInsights) {
             InsightsView()
                 .environmentObject(vm)
+                .environmentObject(subManager)
         }
         .sheet(isPresented: $showSettings) {
             SettingsView()

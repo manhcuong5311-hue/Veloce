@@ -3,14 +3,27 @@ import SwiftUI
 // MARK: - InsightsView
 
 struct InsightsView: View {
-    @EnvironmentObject var vm: ExpenseViewModel
+    @EnvironmentObject var vm:         ExpenseViewModel
+    @EnvironmentObject var subManager: SubscriptionManager
     @Environment(\.dismiss) private var dismiss
 
-    @State private var selectedTab: InsightsTab = .monthly
+    @State private var showAllCards    = false
+    @State private var showAI          = false
+    @State private var aiPrompt:  String? = nil
+    @State private var yearlyExpanded       = false
+    @State private var selectedChartMonth: Int? = nil
 
-    enum InsightsTab: String, CaseIterable {
-        case monthly = "Monthly"
-        case yearly  = "Yearly"
+    private var cards: [InsightCard] {
+        InsightEngine.generate(
+            expenses:      vm.expenses,
+            categories:    vm.categories,
+            monthlyIncome: vm.monthlyIncome,
+            savingGoal:    vm.savingGoal
+        )
+    }
+
+    private var visibleCards: [InsightCard] {
+        showAllCards ? cards : Array(cards.prefix(5))
     }
 
     var body: some View {
@@ -19,23 +32,15 @@ struct InsightsView: View {
                 VeloceTheme.bg.ignoresSafeArea()
 
                 ScrollView(showsIndicators: false) {
-                    VStack(spacing: 0) {
-                        Picker("", selection: $selectedTab) {
-                            ForEach(InsightsTab.allCases, id: \.self) { tab in
-                                Text(tab.rawValue).tag(tab)
-                            }
-                        }
-                        .pickerStyle(.segmented)
-                        .padding(.horizontal, 20)
-                        .padding(.top, 12)
-                        .padding(.bottom, 20)
-
-                        if selectedTab == .monthly {
-                            monthlyContent
-                        } else {
-                            yearlyContent
-                        }
+                    VStack(spacing: 16) {
+                        monthlySummaryStrip
+                        insightCardList
+                        categoryTrendRow
+                        yearlySection
+                        Spacer().frame(height: 32)
                     }
+                    .padding(.horizontal, 20)
+                    .padding(.top, 12)
                 }
             }
             .navigationTitle("Insights")
@@ -43,459 +48,720 @@ struct InsightsView: View {
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Done") { dismiss() }
-                        .fontWeight(.semibold)
+                        .font(.system(size: 15, weight: .semibold))
                         .foregroundStyle(VeloceTheme.accent)
                 }
             }
         }
         .preferredColorScheme(.light)
-    }
-
-    // MARK: - Monthly Content
-
-    private var monthlyContent: some View {
-        let insights   = vm.monthlyInsights(count: 6)
-        let current    = insights.last ?? vm.currentMonthInsight
-        let previous   = insights.dropLast().last
-
-        return VStack(spacing: 16) {
-            // ── Summary card ──────────────────────────────────────
-            monthlySummaryCard(current: current, previous: previous)
-
-            // ── Trend chart ───────────────────────────────────────
-            if insights.contains(where: { $0.totalSpent > 0 }) {
-                trendChartCard(insights: insights)
-            }
-
-            // ── Category breakdown ────────────────────────────────
-            categoryBreakdownCard(insight: current)
-
-            Spacer().frame(height: 32)
+        .sheet(isPresented: $showAI) {
+            AIAssistantView(autoSendPrompt: aiPrompt)
+                .environmentObject(vm)
+                .environmentObject(subManager)
         }
-        .padding(.horizontal, 20)
     }
 
-    // MARK: - Monthly Summary Card
+    // MARK: - Monthly Summary Strip
 
-    private func monthlySummaryCard(
-        current:  ExpenseViewModel.MonthlyInsight,
-        previous: ExpenseViewModel.MonthlyInsight?
-    ) -> some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text(current.fullLabel)
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(VeloceTheme.textSecondary)
-                .tracking(0.3)
+    private var monthlySummaryStrip: some View {
+        let insights = vm.monthlyInsights(count: 6)
+        let current  = insights.last ?? vm.currentMonthInsight
+        let previous = insights.dropLast().last
 
-            // Big spent number
-            HStack(alignment: .lastTextBaseline, spacing: 6) {
-                Text(current.totalSpent.toCurrencyString())
-                    .font(.system(size: 32, weight: .bold, design: .rounded))
-                    .foregroundStyle(VeloceTheme.textPrimary)
-                    .contentTransition(.numericText())
-                Text("spent")
-                    .font(.system(size: 14))
-                    .foregroundStyle(VeloceTheme.textSecondary)
-                    .offset(y: -2)
-            }
+        return HStack(spacing: 0) {
+            summaryPill(
+                label: "Spent",
+                value: current.totalSpent.toCompactCurrency(),
+                color: VeloceTheme.textPrimary
+            )
 
-            // Stats row
-            HStack(spacing: 0) {
-                statPill(
-                    label: "Saved",
-                    value: current.totalSaved.toCompactCurrency(),
-                    color: VeloceTheme.ok,
-                    icon:  "leaf.fill"
+            stripDivider
+
+            summaryPill(
+                label: "Saved",
+                value: current.totalSaved.toCompactCurrency(),
+                color: VeloceTheme.ok
+            )
+
+            if current.income > 0 {
+                stripDivider
+                summaryPill(
+                    label: "Save Rate",
+                    value: String(format: "%.0f%%", current.savingRate),
+                    color: current.savingRate >= 20 ? VeloceTheme.ok : VeloceTheme.caution
                 )
-
-                Spacer()
-
-                if current.income > 0 {
-                    statPill(
-                        label: "Rate",
-                        value: String(format: "%.0f%%", current.savingRate),
-                        color: current.savingRate >= 20 ? VeloceTheme.ok : VeloceTheme.caution,
-                        icon:  "percent"
-                    )
-                    Spacer()
-                }
-
-                if let prev = previous, prev.totalSpent > 0 {
-                    let delta = current.totalSpent - prev.totalSpent
-                    let pct   = prev.totalSpent > 0 ? abs(delta) / prev.totalSpent * 100 : 0
-                    statPill(
-                        label: "vs Last Month",
-                        value: "\(delta >= 0 ? "+" : "-")\(String(format: "%.0f", pct))%",
-                        color: delta <= 0 ? VeloceTheme.ok : VeloceTheme.over,
-                        icon:  delta <= 0 ? "arrow.down" : "arrow.up"
-                    )
-                }
             }
 
-            // Month-over-month comparison blurb
-            if let prev = previous, prev.income > 0, current.income > 0 {
-                let savedDelta = current.totalSaved - prev.totalSaved
-                let pct        = prev.totalSaved > 0
-                    ? abs(savedDelta) / prev.totalSaved * 100
-                    : 0
-                let positive = savedDelta >= 0
-
-                HStack(spacing: 8) {
-                    Image(systemName: positive ? "arrow.up.right.circle.fill" : "arrow.down.right.circle.fill")
-                        .font(.system(size: 14))
-                        .foregroundStyle(positive ? VeloceTheme.ok : VeloceTheme.over)
-                    Text(
-                        positive
-                        ? "You saved \(String(format: "%.0f", pct))% more than last month"
-                        : "You saved \(String(format: "%.0f", pct))% less than last month"
-                    )
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundStyle(VeloceTheme.textSecondary)
-                }
-                .padding(10)
-                .background(
-                    (positive ? VeloceTheme.ok : VeloceTheme.over).opacity(0.08),
-                    in: RoundedRectangle(cornerRadius: 10, style: .continuous)
+            if let prev = previous, prev.totalSpent > 0, current.totalSpent > 0 {
+                let delta = current.totalSpent - prev.totalSpent
+                let pct   = abs(delta) / prev.totalSpent * 100
+                stripDivider
+                summaryPill(
+                    label: "vs Last Month",
+                    value: "\(delta >= 0 ? "+" : "-")\(String(format: "%.0f", pct))%",
+                    color: delta <= 0 ? VeloceTheme.ok : VeloceTheme.over
                 )
             }
         }
-        .veloceCard(radius: 18, padding: 18)
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 14)
+        .background(VeloceTheme.surface)
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .shadow(color: .black.opacity(0.05), radius: 8, y: 2)
     }
 
-    private func statPill(label: String, value: String, color: Color, icon: String) -> some View {
-        VStack(spacing: 4) {
-            HStack(spacing: 3) {
-                Image(systemName: icon)
-                    .font(.system(size: 9, weight: .bold))
-                Text(value)
-                    .font(.system(size: 15, weight: .bold, design: .rounded))
-                    .contentTransition(.numericText())
-            }
-            .foregroundStyle(color)
+    private func summaryPill(label: String, value: String, color: Color) -> some View {
+        VStack(spacing: 3) {
+            Text(value)
+                .font(.system(size: 15, weight: .bold, design: .rounded))
+                .foregroundStyle(color)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
             Text(label)
-                .font(.system(size: 11))
+                .font(.system(size: 10, weight: .medium))
                 .foregroundStyle(VeloceTheme.textTertiary)
         }
+        .frame(maxWidth: .infinity)
     }
 
-    // MARK: - Trend Chart Card
-
-    private func trendChartCard(insights: [ExpenseViewModel.MonthlyInsight]) -> some View {
-        VStack(alignment: .leading, spacing: 14) {
-            Text("6-Month Trend")
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(VeloceTheme.textPrimary)
-
-            let maxSpent = insights.map(\.totalSpent).max() ?? 1
-
-            HStack(alignment: .bottom, spacing: 6) {
-                ForEach(Array(insights.enumerated()), id: \.offset) { idx, insight in
-                    let isLast = idx == insights.count - 1
-                    let ratio  = maxSpent > 0 ? CGFloat(insight.totalSpent / maxSpent) : 0
-
-                    VStack(spacing: 4) {
-                        // Bar
-                        GeometryReader { geo in
-                            VStack(spacing: 0) {
-                                Spacer()
-                                RoundedRectangle(cornerRadius: 5, style: .continuous)
-                                    .fill(isLast ? VeloceTheme.accent : VeloceTheme.accent.opacity(0.35))
-                                    .frame(height: max(4, geo.size.height * ratio))
-                            }
-                        }
-                        .frame(height: 80)
-
-                        Text(insight.shortLabel)
-                            .font(.system(size: 10, weight: .medium))
-                            .foregroundStyle(isLast ? VeloceTheme.textPrimary : VeloceTheme.textTertiary)
-                    }
-                    .frame(maxWidth: .infinity)
-                    .animation(.spring(response: 0.5, dampingFraction: 0.78), value: ratio)
-                }
-            }
-
-            // Legend
-            HStack(spacing: 14) {
-                legendDot(color: VeloceTheme.accent, label: "Current month")
-                legendDot(color: VeloceTheme.accent.opacity(0.35), label: "Previous months")
-            }
-        }
-        .veloceCard(radius: 18, padding: 18)
+    private var stripDivider: some View {
+        Rectangle()
+            .fill(VeloceTheme.divider)
+            .frame(width: 1, height: 30)
     }
 
-    private func legendDot(color: Color, label: String) -> some View {
-        HStack(spacing: 5) {
-            Circle().fill(color).frame(width: 7, height: 7)
-            Text(label)
-                .font(.system(size: 11))
-                .foregroundStyle(VeloceTheme.textTertiary)
-        }
-    }
+    // MARK: - Insight Card List
 
-    // MARK: - Category Breakdown Card
-
-    private func categoryBreakdownCard(insight: ExpenseViewModel.MonthlyInsight) -> some View {
-        let pairs: [(Category, Double)] = vm.categories
-            .compactMap { cat -> (Category, Double)? in
-                guard let amt = insight.byCategory[cat.id], amt > 0 else { return nil }
-                return (cat, amt)
-            }
-            .sorted { $0.1 > $1.1 }
-            .prefix(5)
-            .map { $0 }
-
-        return VStack(alignment: .leading, spacing: 14) {
-            Text("Top Categories")
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(VeloceTheme.textPrimary)
-
-            if pairs.isEmpty {
-                Text("No expenses recorded this month.")
-                    .font(.system(size: 13))
-                    .foregroundStyle(VeloceTheme.textTertiary)
-                    .frame(maxWidth: .infinity, alignment: .center)
-                    .padding(.vertical, 12)
+    private var insightCardList: some View {
+        VStack(spacing: 12) {
+            if cards.isEmpty {
+                emptyState
             } else {
-                let maxAmt = pairs.first?.1 ?? 1
-                VStack(spacing: 10) {
-                    ForEach(pairs, id: \.0.id) { cat, amount in
-                        categoryRow(cat: cat, amount: amount, maxAmount: maxAmt, total: insight.totalSpent)
+                ForEach(visibleCards) { card in
+                    InsightCardView(card: card) {
+                        aiPrompt = card.aiPrompt
+                        showAI   = true
                     }
                 }
-            }
-        }
-        .veloceCard(radius: 18, padding: 18)
-    }
 
-    private func categoryRow(cat: Category, amount: Double, maxAmount: Double, total: Double) -> some View {
-        let color = Color(hex: cat.colorHex)
-        let pct   = total > 0 ? amount / total * 100 : 0
-        let ratio = maxAmount > 0 ? CGFloat(amount / maxAmount) : 0
-
-        return VStack(spacing: 5) {
-            HStack {
-                Image(systemName: cat.icon)
-                    .font(.system(size: 11))
-                    .foregroundStyle(color)
-                    .frame(width: 18)
-                Text(cat.name)
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundStyle(VeloceTheme.textPrimary)
-                Spacer()
-                Text(amount.toCompactCurrency())
-                    .font(.system(size: 13, weight: .semibold, design: .rounded))
-                    .foregroundStyle(VeloceTheme.textPrimary)
-                Text(String(format: "%.0f%%", pct))
-                    .font(.system(size: 11))
-                    .foregroundStyle(VeloceTheme.textTertiary)
-                    .frame(width: 32, alignment: .trailing)
-            }
-            GeometryReader { geo in
-                ZStack(alignment: .leading) {
-                    Capsule().fill(color.opacity(0.12)).frame(height: 5)
-                    Capsule().fill(color).frame(width: geo.size.width * ratio, height: 5)
+                if cards.count > 5 && !showAllCards {
+                    Button(action: { withAnimation(.spring(response: 0.35)) { showAllCards = true } }) {
+                        HStack(spacing: 6) {
+                            Text("Show \(cards.count - 5) more insights")
+                                .font(.system(size: 14, weight: .semibold))
+                            Image(systemName: "chevron.down")
+                                .font(.system(size: 11, weight: .bold))
+                        }
+                        .foregroundStyle(VeloceTheme.accent)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 14)
+                        .background(VeloceTheme.accentBg, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                .strokeBorder(VeloceTheme.accent.opacity(0.25), lineWidth: 1)
+                        )
+                    }
+                    .buttonStyle(.plain)
                 }
             }
-            .frame(height: 5)
         }
     }
 
-    // MARK: - Yearly Content
+    // MARK: - Empty State
 
-    private var yearlyContent: some View {
+    private var emptyState: some View {
+        VStack(spacing: 12) {
+            Image(systemName: "chart.bar.doc.horizontal")
+                .font(.system(size: 36, weight: .light))
+                .foregroundStyle(VeloceTheme.textTertiary)
+            Text("No insights yet")
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundStyle(VeloceTheme.textPrimary)
+            Text("Add a few more expenses and insights will appear here.")
+                .font(.system(size: 13))
+                .foregroundStyle(VeloceTheme.textSecondary)
+                .multilineTextAlignment(.center)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 40)
+        .veloceCard()
+    }
+
+    // MARK: - Category Trend Pills
+
+    private var categoryTrendRow: some View {
+        let monthly  = InsightEngine.buildMonthly(from: vm.expenses, count: 3)
+        let current  = monthly.last
+        let previous = monthly.dropLast().last
+        guard let cur = current, let prev = previous else { return AnyView(EmptyView()) }
+
+        let trends: [(Category, Double, Double)] = vm.visibleCategories.compactMap { cat in
+            let c = cur.byCategory[cat.id]  ?? 0
+            let p = prev.byCategory[cat.id] ?? 0
+            guard c > 0 || p > 0 else { return nil }
+            let pct = p > 0 ? (c - p) / p * 100 : 0
+            return (cat, c, pct)
+        }.sorted { abs($0.2) > abs($1.2) }
+
+        guard !trends.isEmpty else { return AnyView(EmptyView()) }
+
+        return AnyView(
+            VStack(alignment: .leading, spacing: 10) {
+                Text("Category Trends")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(VeloceTheme.textSecondary)
+
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        ForEach(trends, id: \.0.id) { cat, amount, pct in
+                            categoryTrendPill(cat: cat, amount: amount, pct: pct)
+                        }
+                    }
+                    .padding(.horizontal, 1)
+                }
+            }
+        )
+    }
+
+    private func categoryTrendPill(cat: Category, amount: Double, pct: Double) -> some View {
+        let color   = Color(hex: cat.colorHex)
+        let isUp    = pct > 0
+        let isFlat  = abs(pct) < 2
+
+        return VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 5) {
+                Image(systemName: cat.icon)
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(color)
+                Text(cat.name)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(VeloceTheme.textPrimary)
+                    .lineLimit(1)
+            }
+            Text(amount.toCompactCurrency())
+                .font(.system(size: 14, weight: .bold, design: .rounded))
+                .foregroundStyle(VeloceTheme.textPrimary)
+
+            HStack(spacing: 3) {
+                Image(systemName: isFlat ? "minus" : (isUp ? "arrow.up" : "arrow.down"))
+                    .font(.system(size: 8, weight: .bold))
+                Text(isFlat ? "Stable" : "\(String(format: "%.0f%%", abs(pct)))")
+                    .font(.system(size: 10, weight: .semibold))
+            }
+            .foregroundStyle(isFlat ? VeloceTheme.textTertiary : (isUp ? VeloceTheme.over : VeloceTheme.ok))
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background(color.opacity(0.08), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .strokeBorder(color.opacity(0.18), lineWidth: 1)
+        )
+    }
+
+    // MARK: - Yearly Section (collapsible)
+
+    private var yearlySection: some View {
         let insight = vm.yearlyInsight
 
-        return VStack(spacing: 16) {
-            yearlyOverviewCard(insight: insight)
-            if insight.bestMonth != nil || insight.worstMonth != nil {
-                yearlyHighlightsCard(insight: insight)
+        return VStack(spacing: 10) {
+            Button(action: { withAnimation(.spring(response: 0.35)) { yearlyExpanded.toggle() } }) {
+                HStack {
+                    Image(systemName: "calendar")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(VeloceTheme.accent)
+                    Text("\(String(insight.year)) Year Overview")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(VeloceTheme.textPrimary)
+                    Spacer()
+                    Image(systemName: yearlyExpanded ? "chevron.up" : "chevron.down")
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundStyle(VeloceTheme.textTertiary)
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 14)
+                .background(VeloceTheme.surface)
+                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                .shadow(color: .black.opacity(0.04), radius: 6, y: 2)
             }
-            yearlyMonthGridCard(insight: insight)
-            Spacer().frame(height: 32)
+            .buttonStyle(.plain)
+
+            if yearlyExpanded {
+                yearlyDetailContent(insight: insight)
+                    .transition(.opacity.combined(with: .move(edge: .top)))
+            }
         }
-        .padding(.horizontal, 20)
     }
 
-    // MARK: - Yearly Overview Card
-
-    private func yearlyOverviewCard(insight: ExpenseViewModel.YearlyInsight) -> some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text("\(String(insight.year)) Overview")
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(VeloceTheme.textSecondary)
-                .tracking(0.3)
-
-            HStack(alignment: .lastTextBaseline, spacing: 6) {
-                Text(insight.totalSpent.toCurrencyString())
-                    .font(.system(size: 32, weight: .bold, design: .rounded))
-                    .foregroundStyle(VeloceTheme.textPrimary)
-                    .contentTransition(.numericText())
-                Text("spent YTD")
-                    .font(.system(size: 14))
-                    .foregroundStyle(VeloceTheme.textSecondary)
-                    .offset(y: -2)
-            }
-
+    private func yearlyDetailContent(insight: ExpenseViewModel.YearlyInsight) -> some View {
+        VStack(spacing: 12) {
+            // Stats row
             HStack(spacing: 0) {
-                statPill(
-                    label: "Saved",
-                    value: insight.totalSaved.toCompactCurrency(),
-                    color: VeloceTheme.ok,
-                    icon:  "leaf.fill"
-                )
-                Spacer()
-                statPill(
-                    label: "Monthly Avg",
-                    value: insight.monthlyAverage.toCompactCurrency(),
-                    color: VeloceTheme.accent,
-                    icon:  "chart.bar"
-                )
-                Spacer()
-                let nonEmpty = insight.months.filter { $0.totalSpent > 0 }.count
-                statPill(
-                    label: "Active Months",
-                    value: "\(nonEmpty)",
-                    color: VeloceTheme.textSecondary,
-                    icon:  "calendar"
-                )
+                yearlyStat("Total Spent", insight.totalSpent.toCompactCurrency(), VeloceTheme.textPrimary)
+                Divider().frame(height: 34)
+                yearlyStat("Total Saved", insight.totalSaved.toCompactCurrency(), VeloceTheme.ok)
+                Divider().frame(height: 34)
+                yearlyStat("Monthly Avg", insight.monthlyAverage.toCompactCurrency(), VeloceTheme.accent)
             }
+            .veloceCard(radius: 14, padding: 14)
+
+            // Best / Worst month
+            let nonEmpty = insight.months.filter { $0.totalSpent > 0 }
+            if !nonEmpty.isEmpty {
+                HStack(spacing: 10) {
+                    if let best = insight.bestMonth {
+                        yearlyHighlight(
+                            icon: "star.fill", color: VeloceTheme.ok,
+                            label: "Best saving", month: best.shortLabel,
+                            value: best.totalSaved.toCompactCurrency()
+                        )
+                    }
+                    if let worst = insight.worstMonth {
+                        yearlyHighlight(
+                            icon: "flame.fill", color: VeloceTheme.over,
+                            label: "Highest spend", month: worst.shortLabel,
+                            value: worst.totalSpent.toCompactCurrency()
+                        )
+                    }
+                }
+            }
+
+            // Month mini bar chart
+            yearlyBarChart(months: insight.months)
         }
-        .veloceCard(radius: 18, padding: 18)
     }
 
-    // MARK: - Yearly Highlights Card
-
-    private func yearlyHighlightsCard(insight: ExpenseViewModel.YearlyInsight) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Highlights")
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(VeloceTheme.textPrimary)
-
-            if let best = insight.bestMonth {
-                highlightRow(
-                    icon:    "star.fill",
-                    color:   VeloceTheme.ok,
-                    title:   "Best saving month",
-                    detail:  best.fullLabel,
-                    value:   best.totalSaved.toCompactCurrency(),
-                    subtext: String(format: "%.0f%% saved", best.savingRate)
-                )
-            }
-
-            if let worst = insight.worstMonth {
-                highlightRow(
-                    icon:    "flame.fill",
-                    color:   VeloceTheme.over,
-                    title:   "Highest spending month",
-                    detail:  worst.fullLabel,
-                    value:   worst.totalSpent.toCompactCurrency(),
-                    subtext: ""
-                )
-            }
+    private func yearlyStat(_ label: String, _ value: String, _ color: Color) -> some View {
+        VStack(spacing: 3) {
+            Text(value)
+                .font(.system(size: 14, weight: .bold, design: .rounded))
+                .foregroundStyle(color)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+            Text(label)
+                .font(.system(size: 10))
+                .foregroundStyle(VeloceTheme.textTertiary)
         }
-        .veloceCard(radius: 18, padding: 18)
+        .frame(maxWidth: .infinity)
     }
 
-    private func highlightRow(icon: String, color: Color, title: String, detail: String, value: String, subtext: String) -> some View {
-        HStack(spacing: 12) {
+    private func yearlyHighlight(icon: String, color: Color, label: String, month: String, value: String) -> some View {
+        HStack(spacing: 10) {
             ZStack {
-                Circle().fill(color.opacity(0.12)).frame(width: 36, height: 36)
+                Circle().fill(color.opacity(0.12)).frame(width: 32, height: 32)
                 Image(systemName: icon)
-                    .font(.system(size: 14, weight: .semibold))
+                    .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(color)
             }
             VStack(alignment: .leading, spacing: 2) {
-                Text(title)
-                    .font(.system(size: 12))
+                Text(label)
+                    .font(.system(size: 11))
                     .foregroundStyle(VeloceTheme.textTertiary)
-                Text(detail)
-                    .font(.system(size: 14, weight: .semibold))
+                Text(month)
+                    .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(VeloceTheme.textPrimary)
+                Text(value)
+                    .font(.system(size: 12, weight: .bold, design: .rounded))
+                    .foregroundStyle(color)
             }
             Spacer()
-            VStack(alignment: .trailing, spacing: 2) {
-                Text(value)
-                    .font(.system(size: 14, weight: .bold, design: .rounded))
-                    .foregroundStyle(color)
-                if !subtext.isEmpty {
-                    Text(subtext)
-                        .font(.system(size: 11))
-                        .foregroundStyle(VeloceTheme.textTertiary)
-                }
-            }
         }
+        .padding(12)
+        .background(color.opacity(0.06), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .frame(maxWidth: .infinity)
     }
 
-    // MARK: - Yearly Month Grid Card
+    private func yearlyBarChart(months: [ExpenseViewModel.MonthlyInsight]) -> some View {
+        YearlyBarChartView(months: months, selectedIndex: $selectedChartMonth)
+            .veloceCard(radius: 14, padding: 14)
+    }
+}
 
-    private func yearlyMonthGridCard(insight: ExpenseViewModel.YearlyInsight) -> some View {
-        let maxSpent = insight.months.map(\.totalSpent).max() ?? 1
-        let cols     = Array(repeating: GridItem(.flexible(), spacing: 8), count: 3)
+// MARK: - Yearly Bar Chart View
 
-        return VStack(alignment: .leading, spacing: 14) {
+private struct YearlyBarChartView: View {
+
+    typealias MI = ExpenseViewModel.MonthlyInsight
+
+    let months:         [MI]
+    @Binding var selectedIndex: Int?
+
+    private let chartH: CGFloat = 92
+    private let cal = Calendar.current
+
+    // MARK: Derived
+
+    /// Consistent Y-axis ceiling: year maximum × 1.15 padding, min 1 to avoid /0
+    private var maxValue: Double {
+        max(months.map(\.totalSpent).max() ?? 0, 1) * 1.15
+    }
+
+    private func ratio(_ m: MI) -> CGFloat {
+        CGFloat(m.totalSpent / maxValue)
+    }
+
+    /// Index of month with best saving rate (highest savings as % of income)
+    private var bestIdx: Int? {
+        months.indices
+            .filter { months[$0].income > 0 && months[$0].totalSpent > 0 }
+            .max { months[$0].savingRate < months[$1].savingRate }
+    }
+
+    /// Index of month with highest absolute spending
+    private var worstIdx: Int? {
+        months.indices
+            .filter { months[$0].totalSpent > 0 }
+            .max { months[$0].totalSpent < months[$1].totalSpent }
+    }
+
+    private func isCurrent(_ m: MI) -> Bool {
+        cal.isDate(m.monthStart, equalTo: Date(), toGranularity: .month)
+    }
+
+    private func barColor(idx: Int, month: MI) -> Color {
+        if idx == bestIdx  { return VeloceTheme.ok }
+        if idx == worstIdx { return VeloceTheme.over }
+        if isCurrent(month){ return VeloceTheme.accent }
+        return VeloceTheme.accent.opacity(0.30)
+    }
+
+    // MARK: Body
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            headerRow
+            chartArea
+            labelsRow
+            if let sel = selectedIndex, sel >= 0, sel < months.count {
+                tooltipCard(
+                    month:    months[sel],
+                    previous: sel > 0 ? months[sel - 1] : nil
+                )
+                .transition(.opacity.combined(with: .move(edge: .top)))
+            }
+        }
+        .animation(.spring(response: 0.3, dampingFraction: 0.85), value: selectedIndex)
+    }
+
+    // MARK: Header (title + legend)
+
+    private var headerRow: some View {
+        HStack {
             Text("Month by Month")
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(VeloceTheme.textPrimary)
-
-            LazyVGrid(columns: cols, spacing: 10) {
-                ForEach(insight.months, id: \.monthStart) { m in
-                    monthGridCell(month: m, maxSpent: maxSpent)
-                }
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(VeloceTheme.textSecondary)
+            Spacer()
+            HStack(spacing: 10) {
+                legendDot(VeloceTheme.ok,   "Best saving")
+                legendDot(VeloceTheme.over, "Most spent")
             }
         }
-        .veloceCard(radius: 18, padding: 18)
     }
 
-    private func monthGridCell(month: ExpenseViewModel.MonthlyInsight, maxSpent: Double) -> some View {
-        let ratio    = maxSpent > 0 ? CGFloat(month.totalSpent / maxSpent) : 0
-        let isCurrent: Bool = {
-            let cal = Calendar.current
-            return cal.isDate(month.monthStart, equalTo: Date(), toGranularity: .month)
-        }()
+    private func legendDot(_ color: Color, _ label: String) -> some View {
+        HStack(spacing: 3) {
+            Circle().fill(color).frame(width: 6, height: 6)
+            Text(label)
+                .font(.system(size: 9))
+                .foregroundStyle(VeloceTheme.textTertiary)
+        }
+    }
 
-        return VStack(spacing: 6) {
-            Text(month.shortLabel)
-                .font(.system(size: 11, weight: .medium))
-                .foregroundStyle(isCurrent ? VeloceTheme.accent : VeloceTheme.textSecondary)
+    // MARK: Chart area
 
-            GeometryReader { geo in
-                VStack(spacing: 0) {
-                    Spacer()
-                    RoundedRectangle(cornerRadius: 4, style: .continuous)
-                        .fill(isCurrent ? VeloceTheme.accent : VeloceTheme.accent.opacity(0.28))
-                        .frame(height: max(3, geo.size.height * ratio))
+    private var chartArea: some View {
+        GeometryReader { geo in
+            let count = max(months.count, 1)
+            let bw    = geo.size.width / CGFloat(count)
+
+            ZStack(alignment: .topLeading) {
+                // Reference lines + dashed trend line drawn via Canvas
+                overlayCanvas(barWidth: bw)
+
+                // Bars — anchored to bottom
+                HStack(alignment: .bottom, spacing: 0) {
+                    ForEach(Array(months.enumerated()), id: \.offset) { idx, m in
+                        barColumn(idx: idx, month: m)
+                    }
                 }
-            }
-            .frame(height: 40)
-
-            if month.totalSpent > 0 {
-                Text(month.totalSpent.toCompactCurrency())
-                    .font(.system(size: 9, design: .rounded))
-                    .foregroundStyle(VeloceTheme.textTertiary)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.7)
-            } else {
-                Text("—")
-                    .font(.system(size: 9))
-                    .foregroundStyle(VeloceTheme.divider)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
-        .padding(8)
-        .background(
-            isCurrent ? VeloceTheme.accent.opacity(0.06) : VeloceTheme.surfaceRaised,
-            in: RoundedRectangle(cornerRadius: 10, style: .continuous)
-        )
+        .frame(height: chartH)
+    }
+
+    // MARK: Individual bar
+
+    private func barColumn(idx: Int, month: MI) -> some View {
+        let col   = barColor(idx: idx, month: month)
+        let r     = ratio(month)
+        let barH  = month.totalSpent > 0 ? max(4, chartH * r) : 0
+        let isSel = selectedIndex == idx
+        let glow  = (idx == bestIdx || idx == worstIdx)
+
+        return VStack(spacing: 0) {
+            Spacer(minLength: 0)
+            if month.totalSpent == 0 {
+                // Zero-data placeholder — thin line so layout doesn't collapse
+                Capsule()
+                    .fill(VeloceTheme.divider)
+                    .frame(height: 2)
+                    .padding(.horizontal, 6)
+            } else {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 5, style: .continuous)
+                        .fill(col)
+                        .shadow(color: col.opacity(glow ? 0.42 : 0), radius: 5, y: 2)
+                    if isSel {
+                        RoundedRectangle(cornerRadius: 5, style: .continuous)
+                            .strokeBorder(col.opacity(0.8), lineWidth: 1.5)
+                    }
+                }
+                .frame(height: barH)
+                .padding(.horizontal, 3)
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .frame(height: chartH)
+        .contentShape(Rectangle())
+        .onTapGesture {
+            withAnimation(.spring(response: 0.3)) {
+                selectedIndex = (selectedIndex == idx) ? nil : idx
+            }
+        }
+    }
+
+    // MARK: Canvas overlay — reference lines + smooth dashed trend line
+
+    @ViewBuilder
+    private func overlayCanvas(barWidth: CGFloat) -> some View {
+        let mv = maxValue   // capture for Canvas closure
+
+        Canvas { ctx, size in
+            // Subtle horizontal reference lines at 50% and 75% of max value
+            for topFraction in [0.25 as Double, 0.50] {
+                var p = Path()
+                let y = size.height * topFraction
+                p.move(to: CGPoint(x: 0, y: y))
+                p.addLine(to: CGPoint(x: size.width, y: y))
+                ctx.stroke(p, with: .color(VeloceTheme.divider.opacity(0.8)), lineWidth: 0.5)
+            }
+
+            // Smooth bezier trend line (dashed, low opacity)
+            guard months.count > 1, months.contains(where: { $0.totalSpent > 0 }) else { return }
+            let pts: [CGPoint] = months.enumerated().map { i, m in
+                CGPoint(
+                    x: CGFloat(i) * barWidth + barWidth / 2,
+                    y: size.height * (1.0 - CGFloat(m.totalSpent / mv))
+                )
+            }
+            var path = Path()
+            path.move(to: pts[0])
+            for i in 1..<pts.count {
+                let a = pts[i - 1], b = pts[i]
+                let cp1 = CGPoint(x: a.x + (b.x - a.x) * 0.5, y: a.y)
+                let cp2 = CGPoint(x: a.x + (b.x - a.x) * 0.5, y: b.y)
+                path.addCurve(to: b, control1: cp1, control2: cp2)
+            }
+            ctx.stroke(
+                path,
+                with: .color(VeloceTheme.accent.opacity(0.28)),
+                style: StrokeStyle(lineWidth: 1.5, lineCap: .round, lineJoin: .round, dash: [5, 4])
+            )
+        }
+        .frame(height: chartH)
+        .allowsHitTesting(false)
+    }
+
+    // MARK: Month labels row
+
+    private var labelsRow: some View {
+        HStack(spacing: 0) {
+            ForEach(Array(months.enumerated()), id: \.offset) { idx, m in
+                Text(m.shortLabel)
+                    .font(.system(size: 9, weight: selectedIndex == idx ? .bold : .medium))
+                    .foregroundStyle(
+                        isCurrent(m)          ? VeloceTheme.accent :
+                        selectedIndex == idx  ? VeloceTheme.textPrimary :
+                                                VeloceTheme.textTertiary
+                    )
+                    .frame(maxWidth: .infinity)
+            }
+        }
+    }
+
+    // MARK: Tap tooltip
+
+    private func tooltipCard(month: MI, previous: MI?) -> some View {
+        let f        = DateFormatter()
+        f.dateFormat = "MMMM yyyy"
+        f.locale     = Locale(identifier: "en_US")
+
+        let deltaText: String? = {
+            guard let prev = previous, prev.totalSpent > 0, month.totalSpent > 0 else { return nil }
+            let d   = month.totalSpent - prev.totalSpent
+            let pct = abs(d) / prev.totalSpent * 100
+            let sym = d >= 0 ? "▲" : "▼"
+            return "\(sym) \(String(format: "%.0f%%", pct)) vs \(prev.shortLabel)"
+        }()
+        let deltaIsUp = (previous?.totalSpent ?? 0) < month.totalSpent
+
+        return HStack(spacing: 0) {
+            VStack(alignment: .leading, spacing: 6) {
+                Text(f.string(from: month.monthStart))
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundStyle(VeloceTheme.textPrimary)
+
+                HStack(spacing: 14) {
+                    tooltipStat("Spent",  month.totalSpent.toCompactCurrency(), VeloceTheme.textPrimary)
+                    if month.income > 0 {
+                        tooltipStat("Saved",  month.totalSaved.toCompactCurrency(), VeloceTheme.ok)
+                        tooltipStat(
+                            "Rate",
+                            String(format: "%.0f%%", month.savingRate),
+                            month.savingRate >= 20 ? VeloceTheme.ok : VeloceTheme.caution
+                        )
+                    }
+                }
+            }
+            Spacer()
+            if let d = deltaText {
+                Text(d)
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(deltaIsUp ? VeloceTheme.over : VeloceTheme.ok)
+                    .multilineTextAlignment(.trailing)
+            }
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity)
+        .background(VeloceTheme.surfaceRaised, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+    }
+
+    private func tooltipStat(_ label: String, _ value: String, _ color: Color) -> some View {
+        VStack(alignment: .leading, spacing: 1) {
+            Text(value)
+                .font(.system(size: 12, weight: .bold, design: .rounded))
+                .foregroundStyle(color)
+            Text(label)
+                .font(.system(size: 9))
+                .foregroundStyle(VeloceTheme.textTertiary)
+        }
+    }
+}
+
+// MARK: - InsightCardView
+
+struct InsightCardView: View {
+    let card:       InsightCard
+    let onAskAI:    () -> Void
+
+    private var accentColor: Color { Color(hex: card.hexColor) }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            // Header row
+            HStack(spacing: 10) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .fill(accentColor.opacity(0.14))
+                        .frame(width: 38, height: 38)
+                    Image(systemName: card.icon)
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(accentColor)
+                }
+
+                VStack(alignment: .leading, spacing: 2) {
+                    HStack(spacing: 6) {
+                        priorityBadge
+                        Text(card.title)
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(VeloceTheme.textPrimary)
+                            .lineLimit(2)
+                    }
+                }
+                Spacer(minLength: 0)
+            }
+
+            // Key number
+            Text(card.keyNumber)
+                .font(.system(size: 28, weight: .bold, design: .rounded))
+                .foregroundStyle(accentColor)
+
+            // Detail
+            Text(card.detail)
+                .font(.system(size: 13))
+                .foregroundStyle(VeloceTheme.textSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            // Bottom action row
+            HStack(spacing: 8) {
+                if let action = card.action {
+                    Text(action)
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(accentColor)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(accentColor.opacity(0.10), in: Capsule())
+                        .lineLimit(1)
+                }
+
+                Spacer()
+
+                if card.aiPrompt != nil {
+                    Button(action: onAskAI) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "sparkles")
+                                .font(.system(size: 11, weight: .semibold))
+                            Text("Ask AI")
+                                .font(.system(size: 12, weight: .semibold))
+                        }
+                        .foregroundStyle(VeloceTheme.accent)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(VeloceTheme.accentBg, in: Capsule())
+                        .overlay(Capsule().strokeBorder(VeloceTheme.accent.opacity(0.25), lineWidth: 1))
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
+        .padding(16)
+        .background(VeloceTheme.surface)
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .shadow(color: .black.opacity(0.05), radius: 10, y: 2)
         .overlay(
-            isCurrent
-                ? RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .strokeBorder(VeloceTheme.accent.opacity(0.25), lineWidth: 1)
-                : nil
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .strokeBorder(accentColor.opacity(0.12), lineWidth: 1)
         )
+    }
+
+    @ViewBuilder
+    private var priorityBadge: some View {
+        switch card.priority {
+        case .risk:
+            Text("RISK")
+                .font(.system(size: 9, weight: .black))
+                .foregroundStyle(VeloceTheme.over)
+                .padding(.horizontal, 5)
+                .padding(.vertical, 2)
+                .background(VeloceTheme.over.opacity(0.12), in: Capsule())
+        case .opportunity:
+            Text("TIP")
+                .font(.system(size: 9, weight: .black))
+                .foregroundStyle(VeloceTheme.ok)
+                .padding(.horizontal, 5)
+                .padding(.vertical, 2)
+                .background(VeloceTheme.ok.opacity(0.12), in: Capsule())
+        case .informational:
+            EmptyView()
+        }
     }
 }
 
 // MARK: - Preview
 
 #Preview {
-    InsightsView().environmentObject(ExpenseViewModel())
+    InsightsView()
+        .environmentObject(ExpenseViewModel())
+        .environmentObject(SubscriptionManager.shared)
 }
