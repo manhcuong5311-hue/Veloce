@@ -86,7 +86,7 @@ enum AIService {
     }
 
     // MARK: - Amount extraction
-    // Handles: 50k, 1.5tr, 1tr5, 50.000, 50000, 50 (fallback)
+    // Handles: 50k, 1.5tr, 1tr5, 50.000, 50000, word numbers ("twenty five", "một trăm nghìn"), 50 (fallback)
 
     private static func extractAmount(from text: String) -> Double? {
         // "1tr5" → 1,500,000
@@ -112,6 +112,9 @@ enum AIService {
         }
         // plain 4+ digit number: "50000"
         if let m = regexFirst(text, #"\b(\d{4,})\b"#), let v = Double(m) { return v }
+        // Word-based spoken numbers: "twenty five dollars", "một trăm nghìn", "50 nghìn"
+        // Must run before the 1-3 digit fallback so "50 nghìn" → 50_000, not 50.
+        if let v = SpokenNumberParser.parse(text), v > 0 { return v }
         // small fallback 1-3 digits (assume đồng)
         if let m = regexFirst(text, #"\b(\d{1,3})\b"#), let v = Double(m) { return v }
         return nil

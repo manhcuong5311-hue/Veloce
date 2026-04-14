@@ -23,7 +23,9 @@ struct BudgetEditColumnView: View {
     private let colWidth:      CGFloat = 62
     private let maxBarH:       CGFloat = 260    // taller than normal (200) so section expands
     private let trackRadius:   CGFloat = 14
-    private let snapStep:      Double  = 100_000 // 100 k increments
+    // Snap increment: derived from the active currency so the gesture stays
+    // usable after a currency switch (100_000 VND ≠ 100_000 USD).
+    private var snapStep: Double { AppCurrency.current.budgetSnapStep }
     private let dragSensitivity: Double = 0.65  // < 1.0 → finger must travel further per snap
                                                  //   makes precise targeting easier
 

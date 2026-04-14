@@ -64,6 +64,22 @@ enum AppCurrency: String, CaseIterable, Identifiable {
         }
     }
 
+    /// Snap increment used by the budget drag gesture.
+    /// Must be << typical budget values so round(raw / snapStep) doesn't always
+    /// return 0. Rule of thumb: ~1/100 of a typical monthly budget per currency.
+    var budgetSnapStep: Double {
+        switch self {
+        case .vnd: return 100_000   // 100 k₫  (~$4)
+        case .jpy: return 500       // ¥500     (~$3)
+        case .krw: return 1_000     // ₩1,000   (~$0.75)
+        case .usd: return 1         // $1
+        case .eur: return 1         // €1
+        case .gbp: return 1         // £1
+        case .sgd: return 1         // S$1
+        case .thb: return 10        // ฿10      (~$0.28)
+        }
+    }
+
     static var current: AppCurrency {
         AppCurrency(rawValue: UserDefaults.standard.string(forKey: "veloce_currency") ?? "VND") ?? .vnd
     }
