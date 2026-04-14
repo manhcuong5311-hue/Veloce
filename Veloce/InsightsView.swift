@@ -110,7 +110,7 @@ struct InsightsView: View {
         .shadow(color: .black.opacity(0.05), radius: 8, y: 2)
     }
 
-    private func summaryPill(label: String, value: String, color: Color) -> some View {
+    private func summaryPill(label: LocalizedStringKey, value: String, color: Color) -> some View {
         VStack(spacing: 3) {
             Text(value)
                 .font(.system(size: 15, weight: .bold, design: .rounded))
@@ -331,7 +331,7 @@ struct InsightsView: View {
         }
     }
 
-    private func yearlyStat(_ label: String, _ value: String, _ color: Color) -> some View {
+    private func yearlyStat(_ label: LocalizedStringKey, _ value: String, _ color: Color) -> some View {
         VStack(spacing: 3) {
             Text(value)
                 .font(.system(size: 14, weight: .bold, design: .rounded))
@@ -345,7 +345,7 @@ struct InsightsView: View {
         .frame(maxWidth: .infinity)
     }
 
-    private func yearlyHighlight(icon: String, color: Color, label: String, month: String, value: String) -> some View {
+    private func yearlyHighlight(icon: String, color: Color, label: LocalizedStringKey, month: String, value: String) -> some View {
         HStack(spacing: 10) {
             ZStack {
                 Circle().fill(color.opacity(0.12)).frame(width: 32, height: 32)

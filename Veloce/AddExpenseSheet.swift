@@ -157,7 +157,7 @@ struct AddExpenseSheet: View {
             .padding(.vertical, 12)
     }
 
-    private func formRow<C: View>(_ label: String, @ViewBuilder content: () -> C) -> some View {
+    private func formRow<C: View>(_ label: LocalizedStringKey, @ViewBuilder content: () -> C) -> some View {
         HStack {
             Text(label)
                 .font(.system(size: 14))
@@ -385,7 +385,7 @@ struct EditExpenseSheet: View {
             .padding(.vertical, 12)
     }
 
-    private func formRow<C: View>(_ label: String, @ViewBuilder content: () -> C) -> some View {
+    private func formRow<C: View>(_ label: LocalizedStringKey, @ViewBuilder content: () -> C) -> some View {
         HStack {
             Text(label)
                 .font(.system(size: 14))

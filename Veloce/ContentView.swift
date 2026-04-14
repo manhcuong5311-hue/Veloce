@@ -679,7 +679,7 @@ private struct ColumnsCard: View {
     }
 
     private func savingsColumn(
-        label:   String,
+        label:   LocalizedStringKey,
         value:   String,
         color:   Color,
         prefix:  String = "",

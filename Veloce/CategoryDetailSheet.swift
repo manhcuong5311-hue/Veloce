@@ -235,7 +235,7 @@ struct CategoryDetailSheet: View {
         .veloceCard()
     }
 
-    private func miniStat(_ label: String, _ value: String, _ color: Color) -> some View {
+    private func miniStat(_ label: LocalizedStringKey, _ value: String, _ color: Color) -> some View {
         VStack(alignment: .leading, spacing: 3) {
             Text(label)
                 .font(.system(size: 11)).foregroundStyle(VeloceTheme.textTertiary)

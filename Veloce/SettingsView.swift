@@ -32,7 +32,15 @@ struct SettingsView: View {
     private var selectedCurrency: Binding<AppCurrency> {
         Binding(
             get: { AppCurrency(rawValue: currencyCode) ?? .vnd },
-            set: { currencyCode = $0.rawValue }
+            set: { newCurrency in
+                // Convert all stored amounts to the new currency before
+                // writing the key, so values represent the same real-world
+                // money rather than just swapping the symbol.
+                CurrencyManager.shared.changeCurrency(to: newCurrency, vm: vm)
+                // `changeCurrency` writes the UserDefaults key directly, but
+                // @AppStorage needs a matching assignment to stay in sync.
+                currencyCode = newCurrency.rawValue
+            }
         )
     }
     private var selectedSpeechLang: Binding<SpeechLanguage> {
@@ -361,7 +369,7 @@ struct SettingsView: View {
     }
 
     @ViewBuilder
-    private func premiumLockedRow(icon: String, iconColor: Color, title: String, subtitle: String, action: @escaping () -> Void) -> some View {
+    private func premiumLockedRow(icon: String, iconColor: Color, title: LocalizedStringKey, subtitle: LocalizedStringKey, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             HStack(spacing: 12) {
                 ZStack {
@@ -735,7 +743,7 @@ struct SettingsView: View {
 
     // MARK: - Shared header style
 
-    private func sectionHeader(_ title: String, icon: String) -> some View {
+    private func sectionHeader(_ title: LocalizedStringKey, icon: String) -> some View {
         Label(title, systemImage: icon)
             .font(.system(size: 12, weight: .semibold))
             .foregroundStyle(VeloceTheme.textSecondary)
@@ -785,10 +793,10 @@ struct SettingsView: View {
 // MARK: - Amount Edit Sheet (salary / saving target)
 
 private struct AmountEditSheet: View {
-    let title:   String
+    let title:   LocalizedStringKey
     let icon:    String
     let initial: Double
-    let hint:    String
+    let hint:    LocalizedStringKey
     let onSave:  (Double) -> Void
 
     @Environment(\.dismiss) private var dismiss

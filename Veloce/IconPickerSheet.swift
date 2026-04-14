@@ -112,7 +112,7 @@ struct IconPickerSheet: View {
 
     private func iconGroup(_ group: (title: String, icons: [String])) -> some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text(group.title)
+            Text(LocalizedStringKey(group.title))
                 .font(.system(size: 12, weight: .semibold))
                 .foregroundStyle(VeloceTheme.textTertiary)
                 .textCase(.uppercase)
