@@ -4,25 +4,37 @@ import SwiftUI
 // Equatable → SwiftUI skips re-render when props haven't changed
 
 struct CategoryColumnView: View, Equatable {
-    let category:      Category
-    let barRatio:      Double      // 0.0 – 1.0 (clamped)
-    let categoryColor: Color
-    let statusColor:   Color
-    let isHighlighted: Bool
+    let category:       Category
+    let barRatio:       Double      // 0.0 – 1.0 (clamped)
+    let categoryColor:  Color
+    let statusColor:    Color
+    let isHighlighted:  Bool
+
+    /// Dynamic height from the spending panel (compact / medium / expanded)
+    var maxBarH:        CGFloat = 160
+    /// Whether to show name + amount labels below the bar
+    var showLabels:     Bool    = true
+    /// Whether to show the % spent badge (expanded state only)
+    var showPercentage: Bool    = false
+    /// True while the user is live-dragging the resize handle — suppresses bar animations
+    var isResizing:     Bool    = false
 
     var onTap:       () -> Void = {}
     var onLongPress: () -> Void = {}
     var onSwipeUp:   () -> Void = {}
 
     static func == (lhs: Self, rhs: Self) -> Bool {
-        lhs.category      == rhs.category   &&
-        lhs.barRatio      == rhs.barRatio    &&
-        lhs.isHighlighted == rhs.isHighlighted
+        lhs.category       == rhs.category      &&
+        lhs.barRatio       == rhs.barRatio       &&
+        lhs.isHighlighted  == rhs.isHighlighted  &&
+        lhs.maxBarH        == rhs.maxBarH        &&
+        lhs.showLabels     == rhs.showLabels     &&
+        lhs.showPercentage == rhs.showPercentage &&
+        lhs.isResizing     == rhs.isResizing
     }
 
     // Layout constants
     private let colWidth:    CGFloat = 62
-    private let maxBarH:     CGFloat = 200
     private let trackRadius: CGFloat = 14
 
     private var barHeight: CGFloat {
@@ -33,8 +45,16 @@ struct CategoryColumnView: View, Equatable {
     var body: some View {
         VStack(spacing: 10) {
             barColumn
-            nameLabel
-            amountLabel
+
+            if showLabels {
+                nameLabel
+                amountLabel
+            }
+
+            if showPercentage {
+                percentageLabel
+                    .transition(.scale(scale: 0.8).combined(with: .opacity))
+            }
         }
         .frame(width: colWidth)
         // Slight lift when highlighted
@@ -58,7 +78,7 @@ struct CategoryColumnView: View, Equatable {
                 .fill(categoryColor.opacity(0.1))
                 .frame(width: colWidth, height: maxBarH)
 
-            // Filled bar — smooth spring animation on height
+            // Filled bar
             if barHeight > 0 {
                 RoundedRectangle(cornerRadius: trackRadius, style: .continuous)
                     .fill(
@@ -72,9 +92,11 @@ struct CategoryColumnView: View, Equatable {
                         )
                     )
                     .frame(width: colWidth, height: barHeight)
-                    // Spring animation — the key performance-safe way to animate height
+                    // Suppress animation while dragging so bars track the finger directly
                     .animation(
-                        .spring(response: 0.6, dampingFraction: 0.72, blendDuration: 0),
+                        isResizing
+                            ? .none
+                            : .spring(response: 0.55, dampingFraction: 0.75, blendDuration: 0),
                         value: barHeight
                     )
                     .overlay(alignment: .top) {
@@ -84,7 +106,10 @@ struct CategoryColumnView: View, Equatable {
                                 .font(.system(size: 13, weight: .medium))
                                 .foregroundStyle(.white.opacity(0.9))
                                 .frame(width: 28, height: 28)
-                                .background(.white.opacity(0.22), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                                .background(
+                                    .white.opacity(0.22),
+                                    in: RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                )
                                 .padding(.top, 7)
                         }
                     }
@@ -111,10 +136,19 @@ struct CategoryColumnView: View, Equatable {
             }
         }
         .frame(height: maxBarH)
+        // Animate the entire track when panel snaps — same spring as bar fill for coherence
+        .animation(
+            isResizing
+                ? .none
+                : .spring(response: 0.55, dampingFraction: 0.75),
+            value: maxBarH
+        )
         // drawingGroup() rasterises the subtree — critical for performance
         // when many columns animate simultaneously
         .drawingGroup()
     }
+
+    // MARK: - Labels
 
     private var nameLabel: some View {
         Text(category.name)
@@ -130,6 +164,16 @@ struct CategoryColumnView: View, Equatable {
             .foregroundStyle(VeloceTheme.textPrimary)
             .contentTransition(.numericText())
             .animation(.spring(response: 0.4), value: category.spent)
+    }
+
+    private var percentageLabel: some View {
+        let pct = Int((category.spentRatio * 100).rounded())
+        return Text("\(pct)%")
+            .font(.system(size: 10, weight: .semibold, design: .rounded))
+            .foregroundStyle(statusColor)
+            .padding(.horizontal, 6)
+            .padding(.vertical, 3)
+            .background(statusColor.opacity(0.12), in: Capsule())
     }
 
     // MARK: - Swipe-up gesture (quick add)

@@ -3,7 +3,8 @@ import SwiftUI
 // MARK: - Edit Groups Sheet
 
 struct EditGroupsSheet: View {
-    @EnvironmentObject var vm: ExpenseViewModel
+    @EnvironmentObject var vm:         ExpenseViewModel
+    @EnvironmentObject var subManager: SubscriptionManager
     @Environment(\.dismiss) private var dismiss
 
     @State private var editingCategory: Category? = nil
@@ -50,6 +51,7 @@ struct EditGroupsSheet: View {
         .sheet(item: $editingCategory) { cat in
             GroupEditSheet(category: cat)
                 .environmentObject(vm)
+                .environmentObject(subManager)
         }
     }
 }
@@ -63,7 +65,6 @@ private struct GroupRow: View {
 
     var body: some View {
         HStack(spacing: 14) {
-            // Icon badge
             ZStack {
                 RoundedRectangle(cornerRadius: 10, style: .continuous)
                     .fill(Color(hex: category.colorHex).opacity(0.14))
@@ -73,13 +74,10 @@ private struct GroupRow: View {
                     .foregroundStyle(Color(hex: category.colorHex))
             }
 
-            // Name + budget
             VStack(alignment: .leading, spacing: 3) {
                 Text(category.name)
                     .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(category.isHidden
-                                     ? VeloceTheme.textTertiary
-                                     : VeloceTheme.textPrimary)
+                    .foregroundStyle(category.isHidden ? VeloceTheme.textTertiary : VeloceTheme.textPrimary)
                 Text("\(category.spent.toCompactCurrency()) of \(category.budget.toCompactCurrency())")
                     .font(.system(size: 12))
                     .foregroundStyle(VeloceTheme.textTertiary)
@@ -87,7 +85,6 @@ private struct GroupRow: View {
 
             Spacer()
 
-            // Edit button
             Button(action: onEdit) {
                 Image(systemName: "pencil.circle.fill")
                     .font(.system(size: 22))
@@ -96,13 +93,10 @@ private struct GroupRow: View {
             }
             .buttonStyle(.plain)
 
-            // Visibility toggle
             Button(action: { vm.toggleCategoryVisibility(id: category.id) }) {
                 Image(systemName: category.isHidden ? "eye.slash" : "eye")
                     .font(.system(size: 16, weight: .medium))
-                    .foregroundStyle(category.isHidden
-                                     ? VeloceTheme.textTertiary
-                                     : VeloceTheme.accent)
+                    .foregroundStyle(category.isHidden ? VeloceTheme.textTertiary : VeloceTheme.accent)
                     .frame(width: 32, height: 32)
             }
             .buttonStyle(.plain)
@@ -116,7 +110,8 @@ private struct GroupRow: View {
 // MARK: - Group Edit Sheet
 
 private struct GroupEditSheet: View {
-    @EnvironmentObject var vm: ExpenseViewModel
+    @EnvironmentObject var vm:         ExpenseViewModel
+    @EnvironmentObject var subManager: SubscriptionManager
     @Environment(\.dismiss) private var dismiss
 
     let category: Category
@@ -125,6 +120,7 @@ private struct GroupEditSheet: View {
     @State private var selectedIcon:     String
     @State private var budgetText:       String
     @State private var showIconPicker    = false
+    @State private var showPaywall       = false
 
     init(category: Category) {
         self.category     = category
@@ -132,8 +128,6 @@ private struct GroupEditSheet: View {
         _selectedIcon     = State(initialValue: category.icon)
         _budgetText       = State(initialValue: "\(Int(category.budget))")
     }
-
-    // MARK: - Presets
 
     private let presetColors: [String] = [
         "E07A5F", "E8945A", "D4A853", "7BAF5B",
@@ -151,13 +145,8 @@ private struct GroupEditSheet: View {
         ("10 tr",  10_000_000),
     ]
 
-    private var parsedBudget: Double? {
-        Double(budgetText.filter { $0.isNumber })
-    }
-
+    private var parsedBudget: Double? { Double(budgetText.filter { $0.isNumber }) }
     private var isValid: Bool { (parsedBudget ?? 0) > 0 }
-
-    // MARK: - Body
 
     var body: some View {
         NavigationStack {
@@ -191,36 +180,42 @@ private struct GroupEditSheet: View {
         .sheet(isPresented: $showIconPicker) {
             IconPickerSheet(selectedIcon: $selectedIcon)
         }
+        .sheet(isPresented: $showPaywall) {
+            PaywallView().environmentObject(subManager)
+        }
     }
 
-    // MARK: - Header (icon is tappable → opens icon picker)
+    // MARK: - Header (icon tap → picker for Pro, paywall for Free)
 
     private var headerCard: some View {
         HStack(spacing: 16) {
-            // Tappable icon badge
             Button {
                 UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                showIconPicker = true
+                if subManager.isProUser {
+                    showIconPicker = true
+                } else {
+                    showPaywall = true
+                }
             } label: {
                 ZStack(alignment: .bottomTrailing) {
-                    // Circle background
                     Circle()
                         .fill(Color(hex: selectedColorHex).opacity(0.14))
                         .frame(width: 64, height: 64)
 
-                    // Symbol
                     Image(systemName: selectedIcon)
                         .font(.system(size: 26, weight: .medium))
                         .foregroundStyle(Color(hex: selectedColorHex))
                         .frame(width: 64, height: 64)
+                        // Dim slightly when locked
+                        .opacity(subManager.isProUser ? 1.0 : 0.55)
 
-                    // Small pencil badge
+                    // Badge: pencil for Pro, lock for Free
                     ZStack {
                         Circle()
-                            .fill(VeloceTheme.accent)
+                            .fill(subManager.isProUser ? VeloceTheme.accent : VeloceTheme.textSecondary)
                             .frame(width: 20, height: 20)
-                        Image(systemName: "pencil")
-                            .font(.system(size: 10, weight: .bold))
+                        Image(systemName: subManager.isProUser ? "pencil" : "lock.fill")
+                            .font(.system(size: subManager.isProUser ? 10 : 8, weight: .bold))
                             .foregroundStyle(.white)
                     }
                     .offset(x: 2, y: 2)
@@ -235,14 +230,19 @@ private struct GroupEditSheet: View {
                     .font(.system(size: 22, weight: .bold))
                     .foregroundStyle(VeloceTheme.textPrimary)
 
-                // Hint nudges user to tap the icon
-                HStack(spacing: 4) {
-                    Image(systemName: "hand.tap.fill")
-                        .font(.system(size: 10))
-                    Text("Tap icon to customize")
-                        .font(.system(size: 12))
+                if subManager.isProUser {
+                    HStack(spacing: 4) {
+                        Image(systemName: "hand.tap.fill").font(.system(size: 10))
+                        Text("Tap icon to customize").font(.system(size: 12))
+                    }
+                    .foregroundStyle(VeloceTheme.accent.opacity(0.8))
+                } else {
+                    HStack(spacing: 4) {
+                        Image(systemName: "lock.fill").font(.system(size: 9))
+                        Text("Premium: unlock icon & color").font(.system(size: 12))
+                    }
+                    .foregroundStyle(VeloceTheme.textSecondary)
                 }
-                .foregroundStyle(VeloceTheme.accent.opacity(0.8))
             }
             Spacer()
         }
@@ -263,9 +263,7 @@ private struct GroupEditSheet: View {
             ) {
                 ForEach(budgetPresets, id: \.label) { preset in
                     let isSelected = parsedBudget == preset.value
-                    Button {
-                        budgetText = "\(Int(preset.value))"
-                    } label: {
+                    Button { budgetText = "\(Int(preset.value))" } label: {
                         Text(preset.label)
                             .font(.system(size: 13, weight: .semibold))
                             .foregroundStyle(isSelected ? .white : VeloceTheme.textPrimary)
@@ -289,26 +287,19 @@ private struct GroupEditSheet: View {
             }
 
             HStack(spacing: 10) {
-                Image(systemName: "pencil")
-                    .font(.system(size: 13))
-                    .foregroundStyle(VeloceTheme.textTertiary)
-
+                Image(systemName: "pencil").font(.system(size: 13)).foregroundStyle(VeloceTheme.textTertiary)
                 TextField("Custom amount", text: $budgetText)
                     .keyboardType(.numberPad)
                     .font(.system(size: 16, weight: .semibold, design: .rounded))
                     .foregroundStyle(VeloceTheme.textPrimary)
                     .tint(VeloceTheme.accent)
-
                 if let val = parsedBudget, val > 0 {
                     Text(val.toCompactCurrency())
                         .font(.system(size: 13))
                         .foregroundStyle(VeloceTheme.textTertiary)
                         .transition(.opacity)
                 }
-
-                Text("₫")
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundStyle(VeloceTheme.textTertiary)
+                Text("₫").font(.system(size: 14, weight: .medium)).foregroundStyle(VeloceTheme.textTertiary)
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 13)
@@ -325,36 +316,68 @@ private struct GroupEditSheet: View {
         .veloceCard()
     }
 
-    // MARK: - Color Section
+    // MARK: - Color Section (locked for Free users)
 
     private var colorSection: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text("Color")
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(VeloceTheme.textSecondary)
-
-            LazyVGrid(
-                columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 6),
-                spacing: 10
-            ) {
-                ForEach(presetColors, id: \.self) { hex in
-                    let isSelected = selectedColorHex.uppercased() == hex.uppercased()
-                    Button {
-                        selectedColorHex = hex.uppercased()
-                    } label: {
-                        ZStack {
-                            Circle().fill(Color(hex: hex))
-                            if isSelected {
-                                Circle().strokeBorder(.white, lineWidth: 3)
-                                Image(systemName: "checkmark")
-                                    .font(.system(size: 11, weight: .bold))
-                                    .foregroundStyle(.white)
-                            }
+            // Header row with Premium badge when locked
+            HStack {
+                Text("Color")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(VeloceTheme.textSecondary)
+                Spacer()
+                if !subManager.isProUser {
+                    Button(action: { showPaywall = true }) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "lock.fill").font(.system(size: 9, weight: .bold))
+                            Text("Premium").font(.system(size: 11, weight: .semibold))
                         }
-                        .frame(width: 44, height: 44)
+                        .foregroundStyle(VeloceTheme.accent)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3)
+                        .background(VeloceTheme.accentBg, in: Capsule())
                     }
                     .buttonStyle(.plain)
-                    .animation(.spring(response: 0.2), value: isSelected)
+                }
+            }
+
+            // Color grid — interactive for Pro, blurred + locked for Free
+            ZStack {
+                LazyVGrid(
+                    columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 6),
+                    spacing: 10
+                ) {
+                    ForEach(presetColors, id: \.self) { hex in
+                        let isSelected = selectedColorHex.uppercased() == hex.uppercased()
+                        Button {
+                            guard subManager.isProUser else { return }
+                            selectedColorHex = hex.uppercased()
+                        } label: {
+                            ZStack {
+                                Circle().fill(Color(hex: hex))
+                                if isSelected {
+                                    Circle().strokeBorder(.white, lineWidth: 3)
+                                    Image(systemName: "checkmark")
+                                        .font(.system(size: 11, weight: .bold))
+                                        .foregroundStyle(.white)
+                                }
+                            }
+                            .frame(width: 44, height: 44)
+                        }
+                        .buttonStyle(.plain)
+                        .animation(.spring(response: 0.2), value: isSelected)
+                    }
+                }
+                .blur(radius: subManager.isProUser ? 0 : 3)
+                .opacity(subManager.isProUser ? 1.0 : 0.35)
+                .allowsHitTesting(subManager.isProUser)
+
+                // Locked overlay tap target
+                if !subManager.isProUser {
+                    Button(action: { showPaywall = true }) {
+                        Color.clear
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
             }
         }
@@ -383,8 +406,9 @@ private struct GroupEditSheet: View {
         guard isValid, let budget = parsedBudget else { return }
         var updated      = category
         updated.budget   = budget
-        updated.colorHex = selectedColorHex
-        updated.icon     = selectedIcon          // ← persist icon change
+        // Only persist icon/color if Pro; otherwise keep the originals
+        updated.colorHex = subManager.isProUser ? selectedColorHex : category.colorHex
+        updated.icon     = subManager.isProUser ? selectedIcon      : category.icon
         vm.updateCategory(updated)
         dismiss()
     }
@@ -395,4 +419,5 @@ private struct GroupEditSheet: View {
 #Preview {
     EditGroupsSheet()
         .environmentObject(ExpenseViewModel())
+        .environmentObject(SubscriptionManager.shared)
 }

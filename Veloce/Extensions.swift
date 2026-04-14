@@ -64,6 +64,22 @@ enum AppCurrency: String, CaseIterable, Identifiable {
         }
     }
 
+    /// Snap increment used by the budget drag gesture.
+    /// Must be << typical budget values so round(raw / snapStep) doesn't always
+    /// return 0. Rule of thumb: ~1/100 of a typical monthly budget per currency.
+    var budgetSnapStep: Double {
+        switch self {
+        case .vnd: return 100_000   // 100 k₫  (~$4)
+        case .jpy: return 500       // ¥500     (~$3)
+        case .krw: return 1_000     // ₩1,000   (~$0.75)
+        case .usd: return 1         // $1
+        case .eur: return 1         // €1
+        case .gbp: return 1         // £1
+        case .sgd: return 1         // S$1
+        case .thb: return 10        // ฿10      (~$0.28)
+        }
+    }
+
     static var current: AppCurrency {
         AppCurrency(rawValue: UserDefaults.standard.string(forKey: "veloce_currency") ?? "VND") ?? .vnd
     }
@@ -109,9 +125,11 @@ enum VeloceTheme {
     static let textSecondary = Color(hex: "8A8680")
     static let textTertiary  = Color(hex: "C2BEB8")
 
-    // Accent
-    static let accent   = Color(hex: "7B6CF0")   // soft indigo
-    static let accentBg = Color(hex: "EEECFc")   // light indigo wash
+    // Accent — reads from UserDefaults so AccentColorPickerSheet takes effect on next launch
+    static var accent: Color {
+        Color(hex: UserDefaults.standard.string(forKey: "veloce_accent_hex") ?? "7B6CF0")
+    }
+    static var accentBg: Color { accent.opacity(0.12) }
 
     // Status (muted)
     static let ok      = Color(hex: "6BBF8E")    // sage green
@@ -143,6 +161,53 @@ extension Color {
 
     // Pastel tint of any color (80% white blend)
     func pastel(opacity: Double = 0.15) -> Color { self.opacity(opacity) }
+}
+
+// MARK: - Flow Layout
+// Arranges children horizontally, wrapping to the next line when they overflow.
+
+struct FlowLayout: Layout {
+    var spacing: CGFloat = 8
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        layout(subviews: subviews, in: proposal.width ?? 0).size
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        let result = layout(subviews: subviews, in: bounds.width)
+        for (subview, origin) in zip(subviews, result.origins) {
+            subview.place(at: CGPoint(x: bounds.minX + origin.x, y: bounds.minY + origin.y), proposal: .unspecified)
+        }
+    }
+
+    private struct LayoutResult {
+        var origins: [CGPoint]
+        var size:    CGSize
+    }
+
+    private func layout(subviews: Subviews, in width: CGFloat) -> LayoutResult {
+        var origins: [CGPoint] = []
+        var x: CGFloat = 0
+        var y: CGFloat = 0
+        var rowH: CGFloat = 0
+
+        for subview in subviews {
+            let size = subview.sizeThatFits(.unspecified)
+            if x + size.width > width && x > 0 {
+                x = 0
+                y += rowH + spacing
+                rowH = 0
+            }
+            origins.append(CGPoint(x: x, y: y))
+            x += size.width + spacing
+            rowH = max(rowH, size.height)
+        }
+
+        return LayoutResult(
+            origins: origins,
+            size:    CGSize(width: width, height: y + rowH)
+        )
+    }
 }
 
 // MARK: - View modifiers
@@ -226,14 +291,14 @@ extension Date {
     func toRelativeDateString() -> String {
         let cal = Calendar.current
         let f = DateFormatter()
-        f.locale = Locale(identifier: "en_US")
+        f.locale = Locale.current
         if cal.isDateInToday(self) {
             f.dateFormat = "HH:mm"
             return f.string(from: self)
         }
         if cal.isDateInYesterday(self) {
             f.dateFormat = "HH:mm"
-            return "Yesterday · \(f.string(from: self))"
+            return String(format: String(localized: "date_yesterday_time_fmt"), f.string(from: self))
         }
         f.dateFormat = "dd/MM · HH:mm"
         return f.string(from: self)
@@ -248,9 +313,9 @@ extension Date {
     var dayBucket: String {
         let cal = Calendar.current
         let f = DateFormatter()
-        f.locale = Locale(identifier: "en_US")
-        if cal.isDateInToday(self)     { return "Today" }
-        if cal.isDateInYesterday(self) { return "Yesterday" }
+        f.locale = Locale.current
+        if cal.isDateInToday(self)     { return String(localized: "date_today") }
+        if cal.isDateInYesterday(self) { return String(localized: "date_yesterday") }
         f.dateFormat = "EEEE, d MMM"
         return f.string(from: self)
     }

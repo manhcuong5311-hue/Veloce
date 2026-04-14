@@ -29,13 +29,9 @@ final class ExpenseViewModel: ObservableObject {
     @Published var highlightedCategoryId: UUID? = nil
     @Published var isHeightRelative = false
 
-    // Settings — backed by PersistenceStore
-    var monthlyIncome: Double {
-        didSet { PersistenceStore.shared.saveMonthlyIncome(monthlyIncome) }
-    }
-    var savingGoal: Double {
-        didSet { PersistenceStore.shared.saveSavingGoal(savingGoal) }
-    }
+    // Settings — @Published so any view binding to vm updates reactively
+    @Published var monthlyIncome: Double = 0
+    @Published var savingGoal:    Double = 0
 
     // Combine auto-save
     private var cancellables = Set<AnyCancellable>()
@@ -111,6 +107,19 @@ final class ExpenseViewModel: ObservableObject {
         adjustSpent(categoryId: expense.categoryId, delta: +expense.amount)
         highlight(expense.categoryId)
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+
+        // Notification: record log (streak tracking + smart suppression)
+        NotificationManager.shared.recordExpenseLogged()
+
+        // Notification: check budget threshold for the affected category
+        if let cat = categories.first(where: { $0.id == expense.categoryId }) {
+            NotificationManager.shared.checkBudgetThreshold(for: cat)
+        }
+
+        // Rating: record first transaction + evaluate prompt
+        RatingManager.shared.recordFirstTransaction()
+        RatingManager.shared.recordActiveDay()
+        RatingManager.shared.evaluateAfterPositiveAction()
     }
 
     func deleteExpense(_ expense: Expense) {
@@ -212,10 +221,67 @@ final class ExpenseViewModel: ObservableObject {
         }
     }
 
+    // MARK: Export / Import
+
+    func exportJSON() throws -> Data {
+        let payload = VeloceExportData(
+            exportDate:    Date(),
+            version:       "1.0",
+            categories:    categories,
+            expenses:      expenses,
+            monthlyIncome: monthlyIncome,
+            savingGoal:    savingGoal
+        )
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        encoder.outputFormatting     = [.prettyPrinted, .sortedKeys]
+        return try encoder.encode(payload)
+    }
+
+    func importJSON(_ data: Data) throws {
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        let payload = try decoder.decode(VeloceExportData.self, from: data)
+
+        // Recompute .spent from the imported expenses so totals are always consistent
+        let rebuilt = payload.categories.map { cat -> Category in
+            var c = cat
+            c.spent = payload.expenses
+                .filter { $0.categoryId == cat.id }
+                .reduce(0) { $0 + $1.amount }
+            return c
+        }
+
+        withAnimation(.spring(response: 0.4)) {
+            self.categories    = rebuilt
+            self.expenses      = payload.expenses
+            self.monthlyIncome = payload.monthlyIncome
+            self.savingGoal    = payload.savingGoal
+        }
+        let store = PersistenceStore.shared
+        store.saveCategories(rebuilt)
+        store.saveExpenses(payload.expenses)
+        store.saveMonthlyIncome(payload.monthlyIncome)
+        store.saveSavingGoal(payload.savingGoal)
+    }
+
     // MARK: AI
 
     func insight(for category: Category) -> AIInsight? {
-        AIService.generateInsight(for: category, previousSpent: category.spent * 0.72)
+        // Compute actual previous-month spending instead of the fake 0.72 multiplier.
+        let cal = Calendar.current
+        let now = Date()
+        let previousSpent: Double
+        if let prevMonthDate  = cal.date(byAdding: .month, value: -1, to: now),
+           let prevMonthStart = cal.date(from: cal.dateComponents([.year, .month], from: prevMonthDate)),
+           let prevMonthEnd   = cal.date(byAdding: .month, value: 1, to: prevMonthStart) {
+            previousSpent = expenses
+                .filter { $0.categoryId == category.id && $0.date >= prevMonthStart && $0.date < prevMonthEnd }
+                .reduce(0) { $0 + $1.amount }
+        } else {
+            previousSpent = 0
+        }
+        return AIService.generateInsight(for: category, previousSpent: previousSpent)
     }
 
     func monthlyAdvice() -> [AIAdvice] {
@@ -228,6 +294,120 @@ final class ExpenseViewModel: ObservableObject {
 
     func category(for id: UUID) -> Category? {
         categories.first { $0.id == id }
+    }
+
+    // MARK: - Budget Constraint
+
+    /// Maximum total budget allowed by the saving target constraint.
+    /// Returns `.greatestFiniteMagnitude` when no income is set (unconstrained).
+    var maxAllowedTotalBudget: Double {
+        guard monthlyIncome > 0 else { return .greatestFiniteMagnitude }
+        return max(0, monthlyIncome - savingGoal)
+    }
+
+    /// True when the current total budget exceeds the saving-target ceiling.
+    var isBudgetConstrainedBySavingTarget: Bool {
+        monthlyIncome > 0 && savingGoal > 0 && totalBudget > maxAllowedTotalBudget
+    }
+
+    /// Derived balance: income minus actual spending (never stored).
+    var currentBalance: Double { monthlyIncome - totalSpent }
+
+    /// Remaining budget ceiling after subtracting saving target and allocated budgets.
+    var unallocatedBudgetAllowance: Double {
+        guard monthlyIncome > 0 else { return 0 }
+        return monthlyIncome - savingGoal - totalBudget
+    }
+
+    // MARK: - Monthly Insights
+
+    struct MonthlyInsight {
+        let monthStart: Date
+        let totalSpent: Double
+        let income: Double
+        let byCategory: [UUID: Double]   // categoryId → amount spent
+
+        var totalSaved: Double { max(0, income - totalSpent) }
+        var savingRate: Double { income > 0 ? totalSaved / income * 100 : 0 }
+
+        var shortLabel: String {
+            let f = DateFormatter()
+            f.dateFormat = "MMM"
+            f.locale = Locale.current
+            return f.string(from: monthStart)
+        }
+
+        var fullLabel: String {
+            let f = DateFormatter()
+            f.dateFormat = "MMMM yyyy"
+            f.locale = Locale.current
+            return f.string(from: monthStart)
+        }
+    }
+
+    /// Returns the last `count` months of spending data, oldest first.
+    func monthlyInsights(count: Int = 6) -> [MonthlyInsight] {
+        let cal = Calendar.current
+        let now = Date()
+        return (0..<count).reversed().compactMap { offset -> MonthlyInsight? in
+            guard let monthDate  = cal.date(byAdding: .month, value: -offset, to: now),
+                  let monthStart = cal.date(from: cal.dateComponents([.year, .month], from: monthDate)),
+                  let monthEnd   = cal.date(byAdding: .month, value: 1, to: monthStart)
+            else { return nil }
+
+            let monthExpenses = expenses.filter { $0.date >= monthStart && $0.date < monthEnd }
+            let totalSpent    = monthExpenses.reduce(0) { $0 + $1.amount }
+            var byCat: [UUID: Double] = [:]
+            for e in monthExpenses { byCat[e.categoryId, default: 0] += e.amount }
+
+            return MonthlyInsight(
+                monthStart: monthStart,
+                totalSpent: totalSpent,
+                income: monthlyIncome,
+                byCategory: byCat
+            )
+        }
+    }
+
+    /// Current calendar month insight (always present, may have zero spending).
+    var currentMonthInsight: MonthlyInsight {
+        monthlyInsights(count: 1).last
+            ?? MonthlyInsight(monthStart: Date(), totalSpent: 0, income: monthlyIncome, byCategory: [:])
+    }
+
+    // MARK: - Yearly Insights
+
+    struct YearlyInsight {
+        let year: Int
+        let totalSpent: Double
+        let totalSaved: Double
+        let months: [ExpenseViewModel.MonthlyInsight]   // non-empty months
+
+        var monthlyAverage: Double {
+            let nonEmpty = months.filter { $0.totalSpent > 0 }
+            guard !nonEmpty.isEmpty else { return 0 }
+            return totalSpent / Double(nonEmpty.count)
+        }
+
+        var bestMonth: ExpenseViewModel.MonthlyInsight? {
+            months.filter { $0.income > 0 }.max { $0.savingRate < $1.savingRate }
+        }
+
+        var worstMonth: ExpenseViewModel.MonthlyInsight? {
+            months.filter { $0.totalSpent > 0 }.max { $0.totalSpent < $1.totalSpent }
+        }
+    }
+
+    /// Year-to-date aggregated insight for the current calendar year.
+    var yearlyInsight: YearlyInsight {
+        let cal  = Calendar.current
+        let year = cal.component(.year, from: Date())
+        let all  = monthlyInsights(count: 12).filter {
+            cal.component(.year, from: $0.monthStart) == year
+        }
+        let totalSpent = all.reduce(0) { $0 + $1.totalSpent }
+        let totalSaved = all.reduce(0) { $0 + $1.totalSaved }
+        return YearlyInsight(year: year, totalSpent: totalSpent, totalSaved: totalSaved, months: all)
     }
 
     // MARK: Private helpers
@@ -266,13 +446,30 @@ final class ExpenseViewModel: ObservableObject {
     init() {
         let store = PersistenceStore.shared
 
-        // Load persisted state (or fall back to defaults)
-        self.categories    = store.loadCategories() ?? Self.defaultCategories()
-        self.expenses      = store.loadExpenses()   ?? []
-        self.monthlyIncome = store.loadMonthlyIncome()
-        self.savingGoal    = store.loadSavingGoal()
+        let loadedExpenses  = store.loadExpenses() ?? []
+        let rawCategories   = store.loadCategories() ?? Self.defaultCategories()
 
-        // Auto-save whenever published collections change (debounced 400 ms)
+        // Always recompute .spent from the live expense list so crash-diverged
+        // totals are corrected on the next launch (same logic as importJSON).
+        let reconciledCategories = rawCategories.map { cat -> Category in
+            var c = cat
+            c.spent = loadedExpenses
+                .filter { $0.categoryId == cat.id }
+                .reduce(0) { $0 + $1.amount }
+            return c
+        }
+
+        self.categories = reconciledCategories
+        self.expenses   = loadedExpenses
+        _monthlyIncome  = Published(wrappedValue: store.loadMonthlyIncome())
+        _savingGoal     = Published(wrappedValue: store.loadSavingGoal())
+
+        // Persist reconciled categories immediately if they diverged from stored state.
+        if reconciledCategories != rawCategories {
+            store.saveCategories(reconciledCategories)
+        }
+
+        // Auto-save whenever published properties change (debounced 400 ms)
         $categories
             .dropFirst()                         // skip the initial assignment
             .debounce(for: .milliseconds(400), scheduler: RunLoop.main)
@@ -283,6 +480,18 @@ final class ExpenseViewModel: ObservableObject {
             .dropFirst()
             .debounce(for: .milliseconds(400), scheduler: RunLoop.main)
             .sink { store.saveExpenses($0) }
+            .store(in: &cancellables)
+
+        $monthlyIncome
+            .dropFirst()
+            .debounce(for: .milliseconds(400), scheduler: RunLoop.main)
+            .sink { store.saveMonthlyIncome($0) }
+            .store(in: &cancellables)
+
+        $savingGoal
+            .dropFirst()
+            .debounce(for: .milliseconds(400), scheduler: RunLoop.main)
+            .sink { store.saveSavingGoal($0) }
             .store(in: &cancellables)
     }
 }

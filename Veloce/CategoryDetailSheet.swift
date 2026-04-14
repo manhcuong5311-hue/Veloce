@@ -5,12 +5,19 @@ struct CategoryDetailSheet: View {
     @EnvironmentObject var subManager: SubscriptionManager
     @Environment(\.dismiss) private var dismiss
 
-    let category: Category
+    let initialCategory: Category
+    @State private var currentId: UUID
 
-    @State private var editingBudget  = false
-    @State private var budgetInput    = ""
-    @State private var editingExpense: Expense? = nil
-    @State private var showPaywall    = false
+    init(category: Category) {
+        self.initialCategory = category
+        self._currentId = State(initialValue: category.id)
+    }
+
+    @State private var editingBudget           = false
+    @State private var budgetInput             = ""
+    @State private var editingExpense:         Expense? = nil
+    @State private var showPaywall             = false
+    @State private var showBudgetConstraintAlert = false
 
     private let budgetPresets: [(label: String, value: Double)] = [
         ("500K",   500_000),
@@ -23,7 +30,12 @@ struct CategoryDetailSheet: View {
     ]
 
     private var live: Category {
-        vm.categories.first { $0.id == category.id } ?? category
+        vm.categories.first { $0.id == currentId } ?? initialCategory
+    }
+
+    // Visible categories for prev/next navigation
+    private var navIndex: Int? {
+        vm.visibleCategories.firstIndex { $0.id == currentId }
     }
 
     var body: some View {
@@ -73,6 +85,12 @@ struct CategoryDetailSheet: View {
         .sheet(isPresented: $showPaywall) {
             PaywallView().environmentObject(subManager)
         }
+        .alert("Can't Update Budget", isPresented: $showBudgetConstraintAlert) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(String(format: String(localized: "budget_constraint_alert_fmt"),
+                        vm.savingGoal.toCompactCurrency()))
+        }
     }
 
     // MARK: - Header
@@ -92,7 +110,10 @@ struct CategoryDetailSheet: View {
                 Text(live.name)
                     .font(.system(size: 22, weight: .bold))
                     .foregroundStyle(VeloceTheme.textPrimary)
-                Text("\(vm.expenses(for: live.id).count) transactions this month")
+                let monthCount = vm.expenses(for: live.id).filter {
+                    Calendar.current.isDate($0.date, equalTo: Date(), toGranularity: .month)
+                }.count
+                Text(String(format: String(localized: "category_txns_this_month_fmt"), monthCount))
                     .font(.system(size: 13))
                     .foregroundStyle(VeloceTheme.textSecondary)
             }
@@ -214,7 +235,7 @@ struct CategoryDetailSheet: View {
         .veloceCard()
     }
 
-    private func miniStat(_ label: String, _ value: String, _ color: Color) -> some View {
+    private func miniStat(_ label: LocalizedStringKey, _ value: String, _ color: Color) -> some View {
         VStack(alignment: .leading, spacing: 3) {
             Text(label)
                 .font(.system(size: 11)).foregroundStyle(VeloceTheme.textTertiary)
@@ -317,16 +338,31 @@ struct CategoryDetailSheet: View {
         }
     }
 
-    // MARK: - Reorder
+    // MARK: - Prev / Next navigation within visible categories
 
     private func moveBtn(_ dir: Int, _ icon: String) -> some View {
-        Button(action: { vm.moveCategory(id: live.id, by: dir) }) {
+        let cats    = vm.visibleCategories
+        let idx     = navIndex ?? -1
+        let target  = idx + dir
+        let enabled = target >= 0 && target < cats.count
+        return Button {
+            guard enabled else { return }
+            withAnimation(.spring(response: 0.32, dampingFraction: 0.78)) {
+                currentId    = cats[target].id
+                editingBudget = false   // reset inline budget edit on switch
+            }
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        } label: {
             Image(systemName: icon)
                 .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(VeloceTheme.accent)
+                .foregroundStyle(enabled ? VeloceTheme.accent : VeloceTheme.textTertiary)
                 .frame(width: 30, height: 30)
-                .background(VeloceTheme.accentBg, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                .background(
+                    enabled ? VeloceTheme.accentBg : VeloceTheme.surfaceRaised,
+                    in: RoundedRectangle(cornerRadius: 8, style: .continuous)
+                )
         }
+        .disabled(!enabled)
     }
 
     // MARK: - Budget edit
@@ -338,9 +374,19 @@ struct CategoryDetailSheet: View {
 
     private func saveBudget() {
         let cleaned = budgetInput.filter { $0.isNumber }
-        if let val = Double(cleaned), val > 0 {
-            vm.updateBudget(categoryId: live.id, newBudget: val)
+        guard let val = Double(cleaned), val > 0 else {
+            withAnimation(.spring(response: 0.3)) { editingBudget = false }
+            return
         }
+        // Enforce saving-target constraint: new total must not exceed salary − saving target.
+        if vm.monthlyIncome > 0 {
+            let proposedTotal = vm.totalBudget - live.budget + val
+            if proposedTotal > vm.maxAllowedTotalBudget {
+                showBudgetConstraintAlert = true
+                return
+            }
+        }
+        vm.updateBudget(categoryId: live.id, newBudget: val)
         withAnimation(.spring(response: 0.3)) { editingBudget = false }
     }
 }

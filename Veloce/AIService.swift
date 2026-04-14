@@ -28,23 +28,23 @@ enum AIService {
 
         if ratio > 1.0 {
             let over = (category.spent - category.budget).toCompactCurrency()
-            return AIInsight(message: "Over budget by \(over) this month", kind: .alert)
+            return AIInsight(message: String(format: String(localized: "ai_insight_over_budget_fmt"), over), kind: .alert)
         }
         if ratio > 0.85 {
             let left = category.remainingBudget.toCompactCurrency()
-            return AIInsight(message: "Only \(left) left — almost at limit", kind: .warning)
+            return AIInsight(message: String(format: String(localized: "ai_insight_near_limit_fmt"), left), kind: .warning)
         }
         if previousSpent > 0 {
             let growth = (category.spent - previousSpent) / previousSpent
             if growth > 0.3 {
-                return AIInsight(message: "Spending is up \(Int(growth * 100))% vs last week", kind: .warning)
+                return AIInsight(message: String(format: String(localized: "ai_insight_up_pct_fmt"), Int(growth * 100)), kind: .warning)
             }
             if growth < -0.2 {
-                return AIInsight(message: "Down \(Int(abs(growth) * 100))% vs last week — nice!", kind: .positive)
+                return AIInsight(message: String(format: String(localized: "ai_insight_down_pct_fmt"), Int(abs(growth) * 100)), kind: .positive)
             }
         }
         if ratio < 0.25 && category.spent > 0 {
-            return AIInsight(message: "Well under budget — great discipline!", kind: .positive)
+            return AIInsight(message: String(localized: "ai_insight_well_under"), kind: .positive)
         }
         return nil
     }
@@ -62,7 +62,7 @@ enum AIService {
         guard surplus < savingGoal else {
             return [AIAdvice(
                 category: "Overview",
-                suggestion: "You're on track to meet your savings goal this month.",
+                suggestion: String(localized: "ai_advice_on_track"),
                 potentialSaving: 0
             )]
         }
@@ -75,18 +75,18 @@ enum AIService {
                 let cut = cat.spent * 0.2
                 return AIAdvice(
                     category: cat.name,
-                    suggestion: "Reduce \(cat.name) by 20% → save \(cut.toCompactCurrency())/month",
+                    suggestion: String(format: String(localized: "ai_advice_reduce_fmt"), cat.name, cut.toCompactCurrency()),
                     potentialSaving: cut
                 )
             }
 
         return candidates.isEmpty
-            ? [AIAdvice(category: "General", suggestion: "Try cutting discretionary spend by 15%.", potentialSaving: totalSpent * 0.15)]
+            ? [AIAdvice(category: "General", suggestion: String(localized: "ai_advice_cut_discretionary"), potentialSaving: totalSpent * 0.15)]
             : candidates
     }
 
     // MARK: - Amount extraction
-    // Handles: 50k, 1.5tr, 1tr5, 50.000, 50000, 50 (fallback)
+    // Handles: 50k, 1.5tr, 1tr5, 50.000, 50000, word numbers ("twenty five", "một trăm nghìn"), 50 (fallback)
 
     private static func extractAmount(from text: String) -> Double? {
         // "1tr5" → 1,500,000
@@ -112,6 +112,9 @@ enum AIService {
         }
         // plain 4+ digit number: "50000"
         if let m = regexFirst(text, #"\b(\d{4,})\b"#), let v = Double(m) { return v }
+        // Word-based spoken numbers: "twenty five dollars", "một trăm nghìn", "50 nghìn"
+        // Must run before the 1-3 digit fallback so "50 nghìn" → 50_000, not 50.
+        if let v = SpokenNumberParser.parse(text), v > 0 { return v }
         // small fallback 1-3 digits (assume đồng)
         if let m = regexFirst(text, #"\b(\d{1,3})\b"#), let v = Double(m) { return v }
         return nil

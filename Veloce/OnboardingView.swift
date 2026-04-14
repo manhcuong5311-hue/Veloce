@@ -14,6 +14,9 @@ struct OnboardingView: View {
 
     @AppStorage("veloce_onboarding_done") private var onboardingDone = false
 
+    // 4 pages: 0 Welcome | 1 Setup | 2 Notifications | 3 Try It
+    private let totalPages = 4
+
     var body: some View {
         ZStack {
             VeloceTheme.bg.ignoresSafeArea()
@@ -29,8 +32,14 @@ struct OnboardingView: View {
                     Page2(income: $income, savingsGoal: $savingsGoal,
                           onContinue: { applySetup(); advance() },
                           onSkip: advance).tag(1)
+                    PageNotification(onEnable: {
+                        Task {
+                            await NotificationManager.shared.requestPermission()
+                            advance()
+                        }
+                    }, onSkip: advance).tag(2)
                     Page3(input: $tryInput, parsedResult: $parsedResult,
-                          onFinish: finish).tag(2)
+                          onFinish: finish).tag(3)
                 }
                 .tabViewStyle(.page(indexDisplayMode: .never))
                 .animation(.easeInOut(duration: 0.35), value: page)
@@ -43,7 +52,7 @@ struct OnboardingView: View {
 
     private var pageIndicator: some View {
         HStack(spacing: 7) {
-            ForEach(0..<3) { i in
+            ForEach(0..<totalPages) { i in
                 Capsule()
                     .fill(i == page ? VeloceTheme.accent : VeloceTheme.divider)
                     .frame(width: i == page ? 22 : 7, height: 7)
@@ -248,6 +257,112 @@ private struct Page2: View {
                         .fill(VeloceTheme.surface)
                         .shadow(color: .black.opacity(0.05), radius: 10, y: 3)
                 )
+        }
+    }
+}
+
+// MARK: - Page Notification: Permission
+
+private struct PageNotification: View {
+    let onEnable: () -> Void
+    let onSkip:   () -> Void
+
+    @State private var show = false
+    @State private var bellBounce = false
+
+    var body: some View {
+        VStack(spacing: 0) {
+            Spacer()
+
+            VStack(spacing: 36) {
+                // Hero
+                ZStack {
+                    Circle()
+                        .fill(VeloceTheme.accentBg)
+                        .frame(width: 148, height: 148)
+                    Circle()
+                        .fill(VeloceTheme.accent.opacity(0.10))
+                        .frame(width: 200)
+                        .blur(radius: 30)
+                    Image(systemName: "bell.badge.fill")
+                        .font(.system(size: 56, weight: .bold))
+                        .foregroundStyle(VeloceTheme.accent)
+                        .symbolEffect(.bounce, value: bellBounce)
+                }
+                .scaleEffect(show ? 1 : 0.6)
+                .opacity(show ? 1 : 0)
+
+                VStack(spacing: 16) {
+                    Text("Stay on track\nwith your spending")
+                        .font(.system(size: 34, weight: .bold, design: .rounded))
+                        .foregroundStyle(VeloceTheme.textPrimary)
+                        .multilineTextAlignment(.center)
+                        .lineSpacing(2)
+                        .offset(y: show ? 0 : 18)
+                        .opacity(show ? 1 : 0)
+
+                    Text("Get gentle reminders to log expenses\nand track your budget.")
+                        .font(.system(size: 16))
+                        .foregroundStyle(VeloceTheme.textSecondary)
+                        .multilineTextAlignment(.center)
+                        .offset(y: show ? 0 : 14)
+                        .opacity(show ? 1 : 0)
+
+                    // Sample notification pill
+                    HStack(spacing: 10) {
+                        ZStack {
+                            Circle()
+                                .fill(VeloceTheme.accentBg)
+                                .frame(width: 36, height: 36)
+                            Image(systemName: "bolt.fill")
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundStyle(VeloceTheme.accent)
+                        }
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Veloce")
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundStyle(VeloceTheme.textPrimary)
+                            Text("Did you log your spending today?")
+                                .font(.system(size: 12))
+                                .foregroundStyle(VeloceTheme.textSecondary)
+                        }
+                        Spacer()
+                        Text("now")
+                            .font(.system(size: 11))
+                            .foregroundStyle(VeloceTheme.textTertiary)
+                    }
+                    .padding(14)
+                    .background(
+                        RoundedRectangle(cornerRadius: 16, style: .continuous)
+                            .fill(VeloceTheme.surface)
+                            .shadow(color: .black.opacity(0.07), radius: 12, y: 4)
+                    )
+                    .offset(y: show ? 0 : 12)
+                    .opacity(show ? 1 : 0)
+                }
+            }
+            .padding(.horizontal, 28)
+
+            Spacer()
+            Spacer()
+
+            VStack(spacing: 13) {
+                primaryButton("Enable Notifications", action: onEnable)
+
+                Button(action: onSkip) {
+                    Text("Maybe Later")
+                        .font(.system(size: 15, weight: .medium))
+                        .foregroundStyle(VeloceTheme.textTertiary)
+                }
+            }
+            .padding(.horizontal, 28)
+            .padding(.bottom, 56)
+            .offset(y: show ? 0 : 28)
+            .opacity(show ? 1 : 0)
+        }
+        .onAppear {
+            withAnimation(.spring(response: 0.72, dampingFraction: 0.78).delay(0.08)) { show = true }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.9) { bellBounce.toggle() }
         }
     }
 }
