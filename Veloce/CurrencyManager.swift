@@ -18,10 +18,9 @@ import Combine
 //   correct for the expected (rare) currency-change use case.
 //
 // Exchange rates:
-//   Rates are approximate mid-market values baked in as constants.
-//   Call `refreshRates()` on launch (or periodically) to fetch live rates.
-//   The method is async/throws so swapping in a real URLSession call needs
-//   zero architectural change.
+//   Baked-in constants serve as fallbacks. `refreshRates()` is called on launch
+//   to fetch live mid-market rates from open.er-api.com (free tier, no key).
+//   Conversion silently uses the fallback table when the network is unavailable.
 
 @MainActor
 final class CurrencyManager: ObservableObject {
@@ -29,8 +28,7 @@ final class CurrencyManager: ObservableObject {
     static let shared = CurrencyManager()
 
     // MARK: - Rates (USD pivot)
-    // 1 USD = X units of each currency (mid-market approximations).
-    // Production TODO: replace with a live fetch — see `refreshRates()`.
+    // 1 USD = X units of each currency — fallback values used until refreshRates() succeeds.
     private var ratesFromUSD: [String: Double] = [
         "USD": 1.0,
         "VND": 25_400.0,
@@ -119,29 +117,28 @@ final class CurrencyManager: ObservableObject {
         }
     }
 
-    // MARK: - Live Rate Fetch (API-ready stub)
+    // MARK: - Live Rate Fetch
 
     /// Fetches up-to-date mid-market exchange rates and updates the internal
-    /// rate table. No-op in this stub — wire to your preferred API in production.
-    ///
-    /// Suggested provider: https://open.er-api.com/v6/latest/USD (free tier,
-    /// no key needed). Response shape:
-    ///   { "rates": { "VND": 25400, "EUR": 0.92, ... } }
-    ///
+    /// rate table. Uses open.er-api.com (free tier, no API key required).
+    /// Falls back silently — baked-in constants remain active on network failure.
     func refreshRates() async throws {
-        // ── Production implementation ──────────────────────────────────────
-        // struct ERResponse: Decodable { let rates: [String: Double] }
-        //
-        // let url  = URL(string: "https://open.er-api.com/v6/latest/USD")!
-        // let (data, _) = try await URLSession.shared.data(from: url)
-        // let resp = try JSONDecoder().decode(ERResponse.self, from: data)
-        //
-        // // Only update currencies the app actually supports.
-        // let supported = Set(AppCurrency.allCases.map(\.rawValue))
-        // for (code, rate) in resp.rates where supported.contains(code) {
-        //     ratesFromUSD[code] = rate
-        // }
-        // ──────────────────────────────────────────────────────────────────
+        struct ERResponse: Decodable {
+            let result: String
+            let rates:  [String: Double]
+        }
+
+        let url = URL(string: "https://open.er-api.com/v6/latest/USD")!
+        let (data, _) = try await URLSession.shared.data(from: url)
+        let resp = try JSONDecoder().decode(ERResponse.self, from: data)
+
+        guard resp.result == "success" else { return }
+
+        // Only update currencies the app actually supports.
+        let supported = Set(AppCurrency.allCases.map(\.rawValue))
+        for (code, rate) in resp.rates where supported.contains(code) {
+            ratesFromUSD[code] = rate
+        }
     }
 
     // MARK: - Rate for display (optional helper)

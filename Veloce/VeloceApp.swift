@@ -23,6 +23,9 @@ struct VeloceApp: App {
                 .environmentObject(vm)
                 .environmentObject(notifMgr)
                 .environmentObject(ratingMgr)
+                .task {
+                    try? await CurrencyManager.shared.refreshRates()
+                }
         }
     }
 }

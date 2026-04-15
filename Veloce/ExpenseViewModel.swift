@@ -24,14 +24,24 @@ final class ExpenseViewModel: ObservableObject {
 
     // MARK: Published
 
-    @Published var categories: [Category] = []
-    @Published var expenses:   [Expense]  = []
+    @Published var categories:         [Category]         = []
+    @Published var expenses:           [Expense]          = []
+    @Published var recurringExpenses:  [RecurringExpense] = []
     @Published var highlightedCategoryId: UUID? = nil
     @Published var isHeightRelative = false
+
+    /// Set to true when the 20th expense is added (free users → show paywall).
+    @Published var softPaywallTrigger: Bool = false
 
     // Settings — @Published so any view binding to vm updates reactively
     @Published var monthlyIncome: Double = 0
     @Published var savingGoal:    Double = 0
+
+    // MARK: Free-tier constants
+    /// Max categories a free user can create.
+    static let freeCategoryLimit = 6
+    /// History window (days) shown to free users.
+    static let freeHistoryDays   = 30
 
     // Combine auto-save
     private var cancellables = Set<AnyCancellable>()
@@ -120,6 +130,11 @@ final class ExpenseViewModel: ObservableObject {
         RatingManager.shared.recordFirstTransaction()
         RatingManager.shared.recordActiveDay()
         RatingManager.shared.evaluateAfterPositiveAction()
+
+        // Soft paywall: fire once when the user reaches 20 expenses
+        if !softPaywallTrigger && expenses.count == 20 {
+            softPaywallTrigger = true
+        }
     }
 
     func deleteExpense(_ expense: Expense) {
@@ -410,6 +425,53 @@ final class ExpenseViewModel: ObservableObject {
         return YearlyInsight(year: year, totalSpent: totalSpent, totalSaved: totalSaved, months: all)
     }
 
+    // MARK: - History filter (free: 30 days, pro: all)
+
+    /// Returns expenses visible to the current tier.
+    /// Pass `isPro` from SubscriptionManager to avoid a direct dependency.
+    func filteredExpenses(isPro: Bool) -> [Expense] {
+        guard !isPro else { return expenses }
+        let cutoff = Calendar.current.date(byAdding: .day, value: -Self.freeHistoryDays, to: Date()) ?? Date()
+        return expenses.filter { $0.date >= cutoff }
+    }
+
+    // MARK: - Recurring Expenses
+
+    func addRecurring(_ item: RecurringExpense) {
+        recurringExpenses.append(item)
+        PersistenceStore.shared.saveRecurring(recurringExpenses)
+    }
+
+    func deleteRecurring(_ item: RecurringExpense) {
+        recurringExpenses.removeAll { $0.id == item.id }
+        PersistenceStore.shared.saveRecurring(recurringExpenses)
+    }
+
+    func updateRecurring(_ updated: RecurringExpense) {
+        guard let i = recurringExpenses.firstIndex(where: { $0.id == updated.id }) else { return }
+        recurringExpenses[i] = updated
+        PersistenceStore.shared.saveRecurring(recurringExpenses)
+    }
+
+    /// Called on app foreground — auto-adds any overdue recurring expenses
+    /// and advances their next-due date.
+    func processOverdueRecurring() {
+        var changed = false
+        for i in recurringExpenses.indices where recurringExpenses[i].isDue {
+            let r = recurringExpenses[i]
+            addExpense(Expense(
+                title:      r.title,
+                amount:     r.amount,
+                categoryId: r.categoryId,
+                date:       r.nextDueDate,
+                note:       r.note.isEmpty ? "Auto-added (recurring)" : r.note
+            ))
+            recurringExpenses[i].advance()
+            changed = true
+        }
+        if changed { PersistenceStore.shared.saveRecurring(recurringExpenses) }
+    }
+
     // MARK: Private helpers
 
     private func adjustSpent(categoryId: UUID, delta: Double) {
@@ -459,10 +521,11 @@ final class ExpenseViewModel: ObservableObject {
             return c
         }
 
-        self.categories = reconciledCategories
-        self.expenses   = loadedExpenses
-        _monthlyIncome  = Published(wrappedValue: store.loadMonthlyIncome())
-        _savingGoal     = Published(wrappedValue: store.loadSavingGoal())
+        self.categories        = reconciledCategories
+        self.expenses          = loadedExpenses
+        self.recurringExpenses = store.loadRecurring() ?? []
+        _monthlyIncome         = Published(wrappedValue: store.loadMonthlyIncome())
+        _savingGoal            = Published(wrappedValue: store.loadSavingGoal())
 
         // Persist reconciled categories immediately if they diverged from stored state.
         if reconciledCategories != rawCategories {
@@ -492,6 +555,22 @@ final class ExpenseViewModel: ObservableObject {
             .dropFirst()
             .debounce(for: .milliseconds(400), scheduler: RunLoop.main)
             .sink { store.saveSavingGoal($0) }
+            .store(in: &cancellables)
+
+        // Widget data — refresh whenever totals or currency may have changed.
+        Publishers.CombineLatest($categories, $expenses)
+            .dropFirst()
+            .debounce(for: .milliseconds(600), scheduler: RunLoop.main)
+            .sink { [weak self] cats, _ in
+                guard let self else { return }
+                let widgetData = VeloceWidgetData(
+                    totalBudget: cats.reduce(0) { $0 + $1.budget },
+                    totalSpent:  cats.reduce(0) { $0 + $1.spent  },
+                    currency:    AppCurrency.current.rawValue,
+                    updatedAt:   Date()
+                )
+                store.saveWidgetData(widgetData)
+            }
             .store(in: &cancellables)
     }
 }

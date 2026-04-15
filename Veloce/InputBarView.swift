@@ -11,8 +11,11 @@ struct InputBarView: View {
     @State private var parseFailed         = false
     @State private var pendingParsed: ParsedExpense? = nil
 
-    var onAITap:    () -> Void = {}
-    var onManualAdd: () -> Void = {}
+    var onAITap:       () -> Void = {}
+    var onManualAdd:   () -> Void = {}
+    var onRecurringAdd: () -> Void = {}
+
+    @State private var showAddMenu = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -39,6 +42,13 @@ struct InputBarView: View {
         .task { await speech.requestPermissions() }
         .onChange(of: speech.recognizedText) { _, newVal in
             if !newVal.isEmpty { text = newVal }
+        }
+        .confirmationDialog("Add Transaction", isPresented: $showAddMenu, titleVisibility: .visible) {
+            Button("Add Expense") { onManualAdd() }
+            Button("Recurring Transaction") { onRecurringAdd() }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Choose the type of transaction to add")
         }
         .sheet(item: $pendingParsed) { parsed in
             CategoryPickerSheet(parsed: parsed) {
@@ -152,7 +162,7 @@ struct InputBarView: View {
     }
 
     private var addButton: some View {
-        Button(action: onManualAdd) {
+        Button(action: { showAddMenu = true }) {
             ZStack {
                 Circle()
                     .fill(VeloceTheme.surfaceRaised)

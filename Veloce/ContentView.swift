@@ -8,10 +8,12 @@ struct ContentView: View {
     @EnvironmentObject private var subManager: SubscriptionManager
     @EnvironmentObject private var ratingMgr:  RatingManager
     @EnvironmentObject private var notifMgr:   NotificationManager
+    @Environment(\.scenePhase) private var scenePhase
 
     @State private var selectedCategory:   Category? = nil
     @State private var editingExpense:     Expense?  = nil
     @State private var showAddExpense               = false
+    @State private var showAddRecurring             = false
     @State private var quickAddCategoryId: UUID?    = nil
     @State private var showPaywall                  = false
     @State private var showAIAssistant              = false
@@ -52,7 +54,11 @@ struct ContentView: View {
                         .padding(.bottom, 24)
 
                         // ── Timeline expense log ─────────────────────────────
-                        ExpenseTimeline(onEdit: { editingExpense = $0 })
+                        ExpenseTimeline(
+                            isPro:        subManager.isProUser,
+                            onEdit:       { editingExpense = $0 },
+                            onUpgradeTap: { showPaywall = true }
+                        )
                             .environmentObject(vm)
                             .padding(.horizontal, 20)
                             .padding(.bottom, 32)
@@ -97,8 +103,15 @@ struct ContentView: View {
             }
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
-            InputBarView(onAITap: handleAITap, onManualAdd: { showAddExpense = true })
-                .environmentObject(vm)
+            InputBarView(
+                onAITap:        handleAITap,
+                onManualAdd:    { showAddExpense = true },
+                onRecurringAdd: {
+                    if subManager.isProUser { showAddRecurring = true }
+                    else                    { showPaywall = true }
+                }
+            )
+            .environmentObject(vm)
         }
         .sheet(item: $selectedCategory) { cat in
             CategoryDetailSheet(category: cat)
@@ -108,6 +121,11 @@ struct ContentView: View {
         .sheet(isPresented: $showAddExpense, onDismiss: { quickAddCategoryId = nil }) {
             AddExpenseSheet(preselectedCategoryId: quickAddCategoryId)
                 .environmentObject(vm)
+        }
+        .sheet(isPresented: $showAddRecurring) {
+            AddRecurringSheet()
+                .environmentObject(vm)
+                .environmentObject(subManager)
         }
         .sheet(item: $editingExpense) { exp in
             EditExpenseSheet(expense: exp).environmentObject(vm)
@@ -144,6 +162,31 @@ struct ContentView: View {
         }
         .onAppear {
             RatingManager.shared.recordActiveDay()
+            vm.processOverdueRecurring()
+            checkDay7Paywall()
+        }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active {
+                vm.processOverdueRecurring()
+            }
+        }
+        // Soft paywall: trigger after 20th expense for free users
+        .onChange(of: vm.softPaywallTrigger) { _, triggered in
+            if triggered && !subManager.isProUser {
+                showPaywall = true
+                vm.softPaywallTrigger = false
+            } else if triggered {
+                vm.softPaywallTrigger = false
+            }
+        }
+    }
+
+    private func checkDay7Paywall() {
+        guard subManager.shouldShowDay7Paywall else { return }
+        subManager.markDay7PaywallShown()
+        // Delay 2 s so the main UI renders before the sheet appears.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+            showPaywall = true
         }
     }
 
@@ -787,13 +830,30 @@ private struct ColumnsCard: View {
 
 private struct ExpenseTimeline: View {
     @EnvironmentObject var vm: ExpenseViewModel
-    let onEdit: (Expense) -> Void
+    let isPro:         Bool
+    let onEdit:        (Expense) -> Void
+    var onUpgradeTap:  () -> Void = {}
 
     @State private var searchText        = ""
     @State private var filterCategoryId: UUID? = nil
 
+    // 30-day cutoff for free users; nil means show everything (pro)
+    private var historyCutoff: Date? {
+        isPro ? nil
+              : Calendar.current.date(byAdding: .day,
+                                      value: -ExpenseViewModel.freeHistoryDays,
+                                      to: Date())
+    }
+
+    // Number of expenses older than the free window (drives the upgrade banner)
+    private var hiddenExpenseCount: Int {
+        guard let cutoff = historyCutoff else { return 0 }
+        return vm.expenses.filter { $0.date < cutoff }.count
+    }
+
     private var filteredGroups: [ExpenseGroup] {
-        let query = searchText.trimmingCharacters(in: .whitespaces).lowercased()
+        let cutoff = historyCutoff
+        let query  = searchText.trimmingCharacters(in: .whitespaces).lowercased()
         return vm.expenseGroups.compactMap { group in
             let filtered = group.items.filter { expense in
                 let matchesSearch = query.isEmpty
@@ -801,7 +861,8 @@ private struct ExpenseTimeline: View {
                     || expense.note.lowercased().contains(query)
                 let matchesCategory = filterCategoryId == nil
                     || expense.categoryId == filterCategoryId
-                return matchesSearch && matchesCategory
+                let matchesWindow = cutoff == nil || expense.date >= cutoff!
+                return matchesSearch && matchesCategory && matchesWindow
             }
             return filtered.isEmpty ? nil
                 : ExpenseGroup(id: group.id, title: group.title, items: filtered)
@@ -824,7 +885,48 @@ private struct ExpenseTimeline: View {
                     }
                 }
             }
+            // Upgrade nudge — only when older expenses are actually hidden
+            if hiddenExpenseCount > 0 {
+                freeHistoryBanner
+                    .transition(.opacity)
+            }
         }
+    }
+
+    // MARK: - Free-tier history banner (tappable → paywall)
+
+    private var freeHistoryBanner: some View {
+        Button(action: onUpgradeTap) {
+            HStack(spacing: 10) {
+                Image(systemName: "clock.badge.exclamationmark")
+                    .font(.system(size: 15))
+                    .foregroundStyle(VeloceTheme.textTertiary)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Showing last 30 days")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(VeloceTheme.textSecondary)
+                    Text("\(hiddenExpenseCount) older expense\(hiddenExpenseCount == 1 ? "" : "s") hidden · Tap to unlock full history")
+                        .font(.system(size: 11))
+                        .foregroundStyle(VeloceTheme.textTertiary)
+                }
+                Spacer()
+                HStack(spacing: 3) {
+                    Image(systemName: "lock.fill").font(.system(size: 9, weight: .bold))
+                    Text("Pro").font(.system(size: 11, weight: .semibold))
+                }
+                .foregroundStyle(VeloceTheme.accent)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(VeloceTheme.accentBg, in: Capsule())
+            }
+            .padding(12)
+            .background(VeloceTheme.surface, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .strokeBorder(VeloceTheme.accent.opacity(0.25), lineWidth: 1)
+            )
+        }
+        .buttonStyle(.plain)
     }
 
     // MARK: - Search bar

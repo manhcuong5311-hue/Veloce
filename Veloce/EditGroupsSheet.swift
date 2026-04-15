@@ -8,6 +8,12 @@ struct EditGroupsSheet: View {
     @Environment(\.dismiss) private var dismiss
 
     @State private var editingCategory: Category? = nil
+    @State private var showAddGroup:    Bool       = false
+    @State private var showPaywall:     Bool       = false
+
+    private var isAtFreeLimit: Bool {
+        !subManager.isProUser && vm.categories.count >= ExpenseViewModel.freeCategoryLimit
+    }
 
     var body: some View {
         NavigationStack {
@@ -28,6 +34,46 @@ struct EditGroupsSheet: View {
                             .font(.system(size: 11))
                             .foregroundStyle(VeloceTheme.textTertiary)
                             .textCase(nil)
+                    } footer: {
+                        if !subManager.isProUser {
+                            HStack(spacing: 4) {
+                                Image(systemName: "lock.fill").font(.system(size: 10))
+                                Text("Free plan: \(vm.categories.count)/\(ExpenseViewModel.freeCategoryLimit) groups · Upgrade for unlimited")
+                            }
+                            .font(.system(size: 11))
+                            .foregroundStyle(VeloceTheme.textTertiary)
+                        }
+                    }
+
+                    // Add Group button row
+                    Section {
+                        Button(action: handleAddGroup) {
+                            HStack(spacing: 12) {
+                                ZStack {
+                                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                        .fill(VeloceTheme.accentBg)
+                                        .frame(width: 38, height: 38)
+                                    Image(systemName: "plus")
+                                        .font(.system(size: 16, weight: .semibold))
+                                        .foregroundStyle(VeloceTheme.accent)
+                                }
+                                Text("New Group")
+                                    .font(.system(size: 15, weight: .semibold))
+                                    .foregroundStyle(VeloceTheme.accent)
+                                Spacer()
+                                if isAtFreeLimit {
+                                    HStack(spacing: 3) {
+                                        Image(systemName: "lock.fill").font(.system(size: 9, weight: .bold))
+                                        Text("Pro").font(.system(size: 11, weight: .semibold))
+                                    }
+                                    .foregroundStyle(VeloceTheme.accent)
+                                    .padding(.horizontal, 7)
+                                    .padding(.vertical, 3)
+                                    .background(VeloceTheme.accentBg, in: Capsule())
+                                }
+                            }
+                        }
+                        .listRowBackground(VeloceTheme.surface)
                     }
                 }
                 .listStyle(.insetGrouped)
@@ -52,6 +98,22 @@ struct EditGroupsSheet: View {
             GroupEditSheet(category: cat)
                 .environmentObject(vm)
                 .environmentObject(subManager)
+        }
+        .sheet(isPresented: $showAddGroup) {
+            NewGroupSheet()
+                .environmentObject(vm)
+                .environmentObject(subManager)
+        }
+        .sheet(isPresented: $showPaywall) {
+            PaywallView().environmentObject(subManager)
+        }
+    }
+
+    private func handleAddGroup() {
+        if isAtFreeLimit {
+            showPaywall = true
+        } else {
+            showAddGroup = true
         }
     }
 }
@@ -410,6 +472,169 @@ private struct GroupEditSheet: View {
         updated.colorHex = subManager.isProUser ? selectedColorHex : category.colorHex
         updated.icon     = subManager.isProUser ? selectedIcon      : category.icon
         vm.updateCategory(updated)
+        dismiss()
+    }
+}
+
+// MARK: - New Group Sheet
+
+private struct NewGroupSheet: View {
+    @EnvironmentObject var vm:         ExpenseViewModel
+    @EnvironmentObject var subManager: SubscriptionManager
+    @Environment(\.dismiss) private var dismiss
+
+    @State private var name       = ""
+    @State private var budgetText = "1000000"
+    @State private var selectedColorHex = "7B6FF0"
+    @State private var selectedIcon     = "folder.fill"
+    @State private var showIconPicker   = false
+
+    private let presetColors: [String] = [
+        "E07A5F", "E8945A", "D4A853", "7BAF5B",
+        "5BA88C", "4B9FA8", "5B8DB8", "7B6CF0",
+        "9B84D0", "C97BA8", "E86B8B", "8A95A8"
+    ]
+
+    private var parsedBudget: Double? { Double(budgetText.filter { $0.isNumber }) }
+    private var isValid: Bool {
+        !name.trimmingCharacters(in: .whitespaces).isEmpty && (parsedBudget ?? 0) > 0
+    }
+
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                VeloceTheme.bg.ignoresSafeArea()
+
+                ScrollView(showsIndicators: false) {
+                    VStack(spacing: 16) {
+                        // Icon + name
+                        VStack(spacing: 14) {
+                            Button { showIconPicker = true } label: {
+                                ZStack {
+                                    Circle()
+                                        .fill(Color(hex: selectedColorHex).opacity(0.14))
+                                        .frame(width: 68, height: 68)
+                                    Image(systemName: selectedIcon)
+                                        .font(.system(size: 28, weight: .medium))
+                                        .foregroundStyle(Color(hex: selectedColorHex))
+                                }
+                            }
+                            .buttonStyle(.plain)
+
+                            TextField("Group name", text: $name)
+                                .font(.system(size: 20, weight: .semibold))
+                                .foregroundStyle(VeloceTheme.textPrimary)
+                                .multilineTextAlignment(.center)
+                                .tint(VeloceTheme.accent)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 24)
+                        .veloceCard()
+
+                        // Budget
+                        VStack(alignment: .leading, spacing: 10) {
+                            Text("Monthly Budget")
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundStyle(VeloceTheme.textSecondary)
+                            HStack {
+                                Image(systemName: "pencil").foregroundStyle(VeloceTheme.textTertiary)
+                                TextField("Amount", text: $budgetText)
+                                    .keyboardType(.numberPad)
+                                    .font(.system(size: 16, weight: .semibold, design: .rounded))
+                                    .foregroundStyle(VeloceTheme.textPrimary)
+                                    .tint(VeloceTheme.accent)
+                                    .onChange(of: budgetText) { _, v in
+                                        let d = v.filter { $0.isNumber }
+                                        if d != budgetText { budgetText = d }
+                                    }
+                                if let b = parsedBudget, b > 0 {
+                                    Text(b.toCompactCurrency())
+                                        .font(.system(size: 13))
+                                        .foregroundStyle(VeloceTheme.textTertiary)
+                                }
+                            }
+                            .padding(14)
+                            .background(
+                                RoundedRectangle(cornerRadius: 13, style: .continuous)
+                                    .fill(VeloceTheme.surfaceRaised)
+                                    .overlay(RoundedRectangle(cornerRadius: 13, style: .continuous)
+                                        .strokeBorder(VeloceTheme.accent.opacity(0.35), lineWidth: 1.5))
+                            )
+                        }
+                        .veloceCard()
+
+                        // Color picker (Pro only for full grid; everyone gets a color)
+                        VStack(alignment: .leading, spacing: 12) {
+                            Text("Color")
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundStyle(VeloceTheme.textSecondary)
+                            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 6), spacing: 10) {
+                                ForEach(presetColors, id: \.self) { hex in
+                                    let sel = selectedColorHex.uppercased() == hex.uppercased()
+                                    Button { selectedColorHex = hex } label: {
+                                        ZStack {
+                                            Circle().fill(Color(hex: hex))
+                                            if sel {
+                                                Circle().strokeBorder(.white, lineWidth: 3)
+                                                Image(systemName: "checkmark")
+                                                    .font(.system(size: 11, weight: .bold))
+                                                    .foregroundStyle(.white)
+                                            }
+                                        }
+                                        .frame(width: 44, height: 44)
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+                            }
+                        }
+                        .veloceCard()
+
+                        Button(action: save) {
+                            Text("Create Group")
+                                .font(.system(size: 16, weight: .semibold))
+                                .foregroundStyle(.white)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 16)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                        .fill(isValid ? VeloceTheme.accent : VeloceTheme.divider)
+                                )
+                        }
+                        .disabled(!isValid)
+                    }
+                    .padding(20)
+                    .padding(.bottom, 24)
+                }
+            }
+            .navigationTitle("New Group")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button("Cancel") { dismiss() }.foregroundStyle(VeloceTheme.textSecondary)
+                }
+            }
+        }
+        .presentationDetents([.large])
+        .presentationDragIndicator(.visible)
+        .presentationBackground(VeloceTheme.bg)
+        .preferredColorScheme(.light)
+        .sheet(isPresented: $showIconPicker) {
+            IconPickerSheet(selectedIcon: $selectedIcon)
+        }
+    }
+
+    private func save() {
+        guard isValid, let budget = parsedBudget else { return }
+        let newCat = Category(
+            name:     name.trimmingCharacters(in: .whitespaces),
+            icon:     selectedIcon,
+            budget:   budget,
+            colorHex: selectedColorHex
+        )
+        withAnimation(.spring(response: 0.3)) {
+            vm.categories.append(newCat)
+        }
+        UINotificationFeedbackGenerator().notificationOccurred(.success)
         dismiss()
     }
 }
