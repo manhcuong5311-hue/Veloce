@@ -125,6 +125,8 @@ private struct GroupRow: View {
     let category: Category
     let onEdit: () -> Void
 
+    @State private var confirmingDelete = false
+
     var body: some View {
         HStack(spacing: 14) {
             ZStack {
@@ -162,6 +164,25 @@ private struct GroupRow: View {
                     .frame(width: 32, height: 32)
             }
             .buttonStyle(.plain)
+
+            Button(action: { confirmingDelete = true }) {
+                Image(systemName: "trash")
+                    .font(.system(size: 15, weight: .medium))
+                    .foregroundStyle(Color.red.opacity(0.7))
+                    .frame(width: 32, height: 32)
+            }
+            .buttonStyle(.plain)
+            .confirmationDialog(
+                "Delete \"\(category.name)\"?",
+                isPresented: $confirmingDelete,
+                titleVisibility: .visible
+            ) {
+                Button("Delete Group", role: .destructive) {
+                    vm.deleteCategory(id: category.id)
+                }
+            } message: {
+                Text("This cannot be undone. Existing expenses in this group will be kept in your history.")
+            }
         }
         .padding(.vertical, 4)
         .opacity(category.isHidden ? 0.5 : 1.0)
@@ -197,15 +218,9 @@ private struct GroupEditSheet: View {
         "9B84D0", "C97BA8", "E86B8B", "8A95A8"
     ]
 
-    private let budgetPresets: [(label: String, value: Double)] = [
-        ("500K",   500_000),
-        ("1 tr",   1_000_000),
-        ("1.5 tr", 1_500_000),
-        ("2 tr",   2_000_000),
-        ("3 tr",   3_000_000),
-        ("5 tr",   5_000_000),
-        ("10 tr",  10_000_000),
-    ]
+    private var budgetPresets: [(label: String, value: Double)] {
+        AppCurrency.current.budgetPresets
+    }
 
     private var parsedBudget: Double? { Double(budgetText.filter { $0.isNumber }) }
     private var isValid: Bool { (parsedBudget ?? 0) > 0 }
@@ -361,7 +376,7 @@ private struct GroupEditSheet: View {
                         .foregroundStyle(VeloceTheme.textTertiary)
                         .transition(.opacity)
                 }
-                Text("₫").font(.system(size: 14, weight: .medium)).foregroundStyle(VeloceTheme.textTertiary)
+                Text(AppCurrency.current.symbol).font(.system(size: 14, weight: .medium)).foregroundStyle(VeloceTheme.textTertiary)
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 13)
@@ -484,7 +499,7 @@ private struct NewGroupSheet: View {
     @Environment(\.dismiss) private var dismiss
 
     @State private var name       = ""
-    @State private var budgetText = "1000000"
+    @State private var budgetText = AppCurrency.current.defaultBudgetText
     @State private var selectedColorHex = "7B6FF0"
     @State private var selectedIcon     = "folder.fill"
     @State private var showIconPicker   = false

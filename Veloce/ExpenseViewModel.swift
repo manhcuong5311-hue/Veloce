@@ -216,6 +216,14 @@ final class ExpenseViewModel: ObservableObject {
         for exp in items { deleteExpense(exp) }
     }
 
+    func deleteCategory(id: UUID) {
+        // Expenses that referenced this category keep their categoryId but will no longer
+        // appear in any category's budget tracking. They remain visible in the timeline.
+        withAnimation(.spring(response: 0.3)) {
+            categories.removeAll { $0.id == id }
+        }
+    }
+
     func toggleCategoryVisibility(id: UUID) {
         guard let i = categories.firstIndex(where: { $0.id == id }) else { return }
         withAnimation(.spring(response: 0.3)) { categories[i].isHidden.toggle() }
