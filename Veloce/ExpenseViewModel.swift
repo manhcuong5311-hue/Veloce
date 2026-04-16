@@ -477,6 +477,11 @@ final class ExpenseViewModel: ObservableObject {
     func addRecurring(_ item: RecurringExpense) {
         recurringExpenses.append(item)
         PersistenceStore.shared.saveRecurringSync(recurringExpenses)
+        // FIX: Process immediately so a "due today" item generates its expense
+        // in the current session rather than requiring an app restart.
+        // processOverdueRecurring() calls advance(), shifting nextDueDate forward —
+        // so on the next launch isDue == false and no duplicate is created.
+        processOverdueRecurring()
     }
 
     func deleteRecurring(_ item: RecurringExpense) {
@@ -488,6 +493,9 @@ final class ExpenseViewModel: ObservableObject {
         guard let i = recurringExpenses.firstIndex(where: { $0.id == updated.id }) else { return }
         recurringExpenses[i] = updated
         PersistenceStore.shared.saveRecurringSync(recurringExpenses)
+        // FIX: Re-process in case the edit moved nextDueDate to today or earlier.
+        // Same idempotency guarantee as addRecurring — advance() prevents duplicates.
+        processOverdueRecurring()
     }
 
     /// Called on app foreground — auto-adds any overdue recurring expenses

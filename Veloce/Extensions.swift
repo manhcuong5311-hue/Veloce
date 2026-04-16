@@ -227,6 +227,19 @@ extension Color {
         self.init(.sRGB, red: Double(r) / 255, green: Double(g) / 255, blue: Double(b) / 255)
     }
 
+    /// Convert a SwiftUI Color to a 6-character uppercase hex string (no alpha).
+    /// Uses UIColor bridging to reliably extract sRGB components.
+    /// Falls back to Veloce accent purple if components cannot be resolved.
+    func toHex() -> String {
+        let ui = UIColor(self)
+        var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+        guard ui.getRed(&r, green: &g, blue: &b, alpha: &a) else { return "7B6CF0" }
+        return String(format: "%02X%02X%02X",
+                      Int((r * 255).rounded()),
+                      Int((g * 255).rounded()),
+                      Int((b * 255).rounded()))
+    }
+
     // Pastel tint of any color (80% white blend)
     func pastel(opacity: Double = 0.15) -> Color { self.opacity(opacity) }
 }

@@ -324,6 +324,12 @@ private struct ColumnsCard: View {
     @State private var activeCategoryId:      UUID?  = nil
     @State private var fixedTotalBudget:      Double = 0   // total frozen on entry
     @State private var showConstraintModal:   Bool   = false
+    // FIX: scroll target for the edit-mode column strip.
+    // Set by the category chip nav bar OR by onDragStart — ScrollViewReader
+    // picks this up via onChange and scrolls the active column into view.
+    // Using UUID? lets us reset to nil after scrolling so the same chip can
+    // trigger a re-scroll if the user has manually scrolled away.
+    @State private var editScrollTarget:      UUID?  = nil
 
     // Panel resize state
     @AppStorage("spending_panel_state") private var savedState: String = SpendingPanelState.medium.rawValue
@@ -367,32 +373,69 @@ private struct ColumnsCard: View {
             }
 
             // ── Columns ──────────────────────────────────────────
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(alignment: .bottom, spacing: 14) {
-                    if isEditingBudget {
-                        ForEach(vm.visibleCategories) { cat in
-                            BudgetEditColumnView(
-                                category:      cat,
-                                totalBudget:   fixedTotalBudget,
-                                categoryColor: vm.categoryColor(for: cat),
-                                isActive:      activeCategoryId == cat.id,
-                                isAnyActive:   activeCategoryId != nil,
-                                onBudgetChange: { newBudget in
-                                    applyBudget(newBudget, for: cat)
-                                },
-                                onDragStart: {
-                                    withAnimation(.spring(response: 0.28)) {
-                                        activeCategoryId = cat.id
+            // FIX: split edit vs normal mode into separate blocks so edit mode
+            // can add a category navigation strip + ScrollViewReader without
+            // wrapping the normal-mode view in unnecessary layers.
+            if isEditingBudget {
+                // ── Category navigation chips ─────────────────────
+                // Allows switching to any category column by tapping its chip,
+                // eliminating the Done → back → swipe → re-enter edit cycle.
+                // Chips set editScrollTarget; the ScrollViewReader below reacts.
+                editCategoryChips
+
+                // ── Edit columns with programmatic scroll support ──
+                ScrollViewReader { proxy in
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(alignment: .bottom, spacing: 14) {
+                            ForEach(vm.visibleCategories) { cat in
+                                BudgetEditColumnView(
+                                    category:      cat,
+                                    totalBudget:   fixedTotalBudget,
+                                    categoryColor: vm.categoryColor(for: cat),
+                                    isActive:      activeCategoryId == cat.id,
+                                    isAnyActive:   activeCategoryId != nil,
+                                    onBudgetChange: { newBudget in
+                                        applyBudget(newBudget, for: cat)
+                                    },
+                                    onDragStart: {
+                                        withAnimation(.spring(response: 0.28)) {
+                                            activeCategoryId = cat.id
+                                        }
+                                        // Auto-scroll the column being dragged into view
+                                        // so it doesn't get obscured at the edge.
+                                        editScrollTarget = cat.id
+                                    },
+                                    onDragEnd: {
+                                        withAnimation(.spring(response: 0.35)) {
+                                            activeCategoryId = nil
+                                        }
                                     }
-                                },
-                                onDragEnd: {
-                                    withAnimation(.spring(response: 0.35)) {
-                                        activeCategoryId = nil
-                                    }
-                                }
-                            )
+                                )
+                                // .id() anchors enable ScrollViewReader.scrollTo()
+                                .id(cat.id)
+                            }
                         }
-                    } else {
+                        .padding(.horizontal, 2)
+                        // Extra top padding so the live budget bubble has breathing
+                        // room near the card's top edge.
+                        .padding(.top, 10)
+                        .padding(.bottom, 4)
+                    }
+                    // Respond to chip taps and drag-start auto-scroll.
+                    // Reset to nil after scrolling so the same chip can re-trigger
+                    // a scroll if the user has manually scrolled away.
+                    .onChange(of: editScrollTarget) { _, target in
+                        if let target {
+                            withAnimation(.spring(response: 0.40, dampingFraction: 0.82)) {
+                                proxy.scrollTo(target, anchor: .center)
+                            }
+                            editScrollTarget = nil
+                        }
+                    }
+                }
+            } else {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(alignment: .bottom, spacing: 14) {
                         ForEach(vm.visibleCategories) { cat in
                             CategoryColumnView(
                                 category:       cat,
@@ -411,12 +454,9 @@ private struct ColumnsCard: View {
                             .equatable()
                         }
                     }
+                    .padding(.horizontal, 2)
+                    .padding(.bottom, 4)
                 }
-                .padding(.horizontal, 2)
-                // Extra top padding in edit mode so the bubble (inside barStack) has
-                // visual breathing room near the card's top edge.
-                .padding(.top, isEditingBudget ? 10 : 0)
-                .padding(.bottom, 4)
             }
 
             // ── Resize handle (hidden in edit mode) ──────────────
@@ -766,6 +806,40 @@ private struct ColumnsCard: View {
             .foregroundStyle(VeloceTheme.textTertiary)
             .frame(maxWidth: .infinity)
             .padding(.top, 12)
+    }
+
+    // MARK: - Edit mode category navigation strip
+
+    /// A horizontally scrolling row of category chips shown only during budget editing.
+    /// Tapping a chip sets editScrollTarget, which the ScrollViewReader converts into a
+    /// smooth programmatic scroll — letting the user jump between categories without
+    /// pressing "Done" and re-entering edit mode.
+    private var editCategoryChips: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                ForEach(vm.visibleCategories) { cat in
+                    Button {
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        editScrollTarget = cat.id
+                    } label: {
+                        HStack(spacing: 5) {
+                            Image(systemName: cat.icon)
+                                .font(.system(size: 10))
+                                .foregroundStyle(vm.categoryColor(for: cat))
+                            Text(cat.name)
+                                .font(.system(size: 12, weight: .medium))
+                                .foregroundStyle(VeloceTheme.textSecondary)
+                        }
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 5)
+                        .background(VeloceTheme.surfaceRaised, in: Capsule())
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.horizontal, 2)
+        }
+        .transition(.move(edge: .top).combined(with: .opacity))
     }
 
     // MARK: - Edit Budget button (replaces the old Absolute/Relative toggle)

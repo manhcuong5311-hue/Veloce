@@ -30,7 +30,7 @@ struct EditGroupsSheet: View {
                         }
                         .onMove { vm.reorderCategories(from: $0, to: $1) }
                     } header: {
-                        Text("Drag to reorder  ·  tap ✏️ to edit limit, color & icon")
+                        Text(String(localized: "groups.reorder_hint"))
                             .font(.system(size: 11))
                             .foregroundStyle(VeloceTheme.textTertiary)
                             .textCase(nil)
@@ -38,7 +38,9 @@ struct EditGroupsSheet: View {
                         if !subManager.isProUser {
                             HStack(spacing: 4) {
                                 Image(systemName: "lock.fill").font(.system(size: 10))
-                                Text("Free plan: \(vm.categories.count)/\(ExpenseViewModel.freeCategoryLimit) groups · Upgrade for unlimited")
+                                Text(String(localized: "groups.free_limit",
+                                            defaultValue: "Free plan: \(vm.categories.count)/\(ExpenseViewModel.freeCategoryLimit) groups · Upgrade for unlimited"))
+
                             }
                             .font(.system(size: 11))
                             .foregroundStyle(VeloceTheme.textTertiary)
@@ -57,14 +59,16 @@ struct EditGroupsSheet: View {
                                         .font(.system(size: 16, weight: .semibold))
                                         .foregroundStyle(VeloceTheme.accent)
                                 }
-                                Text("New Group")
+                                Text(String(localized: "groups.new"))
+
                                     .font(.system(size: 15, weight: .semibold))
                                     .foregroundStyle(VeloceTheme.accent)
                                 Spacer()
                                 if isAtFreeLimit {
                                     HStack(spacing: 3) {
                                         Image(systemName: "lock.fill").font(.system(size: 9, weight: .bold))
-                                        Text("Pro").font(.system(size: 11, weight: .semibold))
+                                        Text(String(localized: "common.pro"))
+                                            .font(.system(size: 11, weight: .semibold))
                                     }
                                     .foregroundStyle(VeloceTheme.accent)
                                     .padding(.horizontal, 7)
@@ -80,11 +84,13 @@ struct EditGroupsSheet: View {
                 .scrollContentBackground(.hidden)
                 .environment(\.editMode, .constant(.active))
             }
-            .navigationTitle("Edit Groups")
+            .navigationTitle(String(localized: "groups.edit_title"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button("Done") { dismiss() }
+                    Button(String(localized: "common.done")) {
+                        dismiss()
+                    }
                         .font(.system(size: 15, weight: .semibold))
                         .foregroundStyle(VeloceTheme.accent)
                 }
@@ -173,15 +179,15 @@ private struct GroupRow: View {
             }
             .buttonStyle(.plain)
             .confirmationDialog(
-                "Delete \"\(category.name)\"?",
+                String(localized: "groups.delete.confirm_title", defaultValue: "Delete \"\(category.name)\"?"),
                 isPresented: $confirmingDelete,
                 titleVisibility: .visible
             ) {
-                Button("Delete Group", role: .destructive) {
+                Button(String(localized: "groups.delete.action"), role: .destructive) {
                     vm.deleteCategory(id: category.id)
                 }
             } message: {
-                Text("This cannot be undone. Existing expenses in this group will be kept in your history.")
+                Text(String(localized: "groups.delete.message"))
             }
         }
         .padding(.vertical, 4)
@@ -204,12 +210,16 @@ private struct GroupEditSheet: View {
     @State private var budgetText:       String
     @State private var showIconPicker    = false
     @State private var showPaywall       = false
+    // FIX: backing state for the native ColorPicker — kept in sync with
+    // selectedColorHex so the picker always reflects the active colour.
+    @State private var customColor: Color
 
     init(category: Category) {
         self.category     = category
         _selectedColorHex = State(initialValue: category.colorHex.uppercased())
         _selectedIcon     = State(initialValue: category.icon)
         _budgetText       = State(initialValue: "\(Int(category.budget))")
+        _customColor      = State(initialValue: Color(hex: category.colorHex))
     }
 
     private let presetColors: [String] = [
@@ -429,6 +439,9 @@ private struct GroupEditSheet: View {
                         Button {
                             guard subManager.isProUser else { return }
                             selectedColorHex = hex.uppercased()
+                            // FIX: keep the native ColorPicker in sync with the preset choice
+                            // so it shows the correct colour when the user opens it next.
+                            customColor = Color(hex: hex)
                         } label: {
                             ZStack {
                                 Circle().fill(Color(hex: hex))
@@ -455,6 +468,32 @@ private struct GroupEditSheet: View {
                         Color.clear
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
+                }
+            }
+
+            // FIX: Custom colour picker for Pro users — placed below the preset grid.
+            // Uses the native SwiftUI ColorPicker (HSB wheel + hex input on iOS).
+            // onChange converts the picked Color → 6-char hex and updates selectedColorHex
+            // so all downstream views (header circle, save button, etc.) stay consistent.
+            // Not shown for free users to avoid UI clutter when the feature is locked.
+            if subManager.isProUser {
+                Divider()
+                    .padding(.top, 4)
+                HStack {
+                    Image(systemName: "eyedropper")
+                        .font(.system(size: 13))
+                        .foregroundStyle(VeloceTheme.textSecondary)
+                    Text("Custom")
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(VeloceTheme.textSecondary)
+                    Spacer()
+                    ColorPicker("", selection: $customColor, supportsOpacity: false)
+                        .labelsHidden()
+                        .onChange(of: customColor) { _, newColor in
+                            // Convert Color → hex and propagate to selectedColorHex.
+                            // This deselects all presets (no checkmark) — expected behaviour.
+                            selectedColorHex = newColor.toHex()
+                        }
                 }
             }
         }
@@ -500,9 +539,11 @@ private struct NewGroupSheet: View {
 
     @State private var name       = ""
     @State private var budgetText = AppCurrency.current.defaultBudgetText
-    @State private var selectedColorHex = "7B6FF0"
+    @State private var selectedColorHex = "7B6CF0"
     @State private var selectedIcon     = "folder.fill"
     @State private var showIconPicker   = false
+    // FIX: backing state for the native ColorPicker (same pattern as GroupEditSheet)
+    @State private var customColor: Color = Color(hex: "7B6CF0")
 
     private let presetColors: [String] = [
         "E07A5F", "E8945A", "D4A853", "7BAF5B",
@@ -586,7 +627,11 @@ private struct NewGroupSheet: View {
                             LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 6), spacing: 10) {
                                 ForEach(presetColors, id: \.self) { hex in
                                     let sel = selectedColorHex.uppercased() == hex.uppercased()
-                                    Button { selectedColorHex = hex } label: {
+                                    Button {
+                                        selectedColorHex = hex
+                                        // FIX: keep the native picker in sync when a preset is chosen
+                                        customColor = Color(hex: hex)
+                                    } label: {
                                         ZStack {
                                             Circle().fill(Color(hex: hex))
                                             if sel {
@@ -600,6 +645,27 @@ private struct NewGroupSheet: View {
                                     }
                                     .buttonStyle(.plain)
                                 }
+                            }
+
+                            // FIX: Custom colour picker available to all users in NewGroupSheet
+                            // (no Pro gate — group creation doesn't gatekeep colour choice).
+                            Divider()
+                                .padding(.top, 4)
+                            HStack {
+                                Image(systemName: "eyedropper")
+                                    .font(.system(size: 13))
+                                    .foregroundStyle(VeloceTheme.textSecondary)
+                                Text("Custom")
+                                    .font(.system(size: 13, weight: .medium))
+                                    .foregroundStyle(VeloceTheme.textSecondary)
+                                Spacer()
+                                ColorPicker("", selection: $customColor, supportsOpacity: false)
+                                    .labelsHidden()
+                                    .onChange(of: customColor) { _, newColor in
+                                        // Propagate custom pick to selectedColorHex and
+                                        // deselect all presets visually.
+                                        selectedColorHex = newColor.toHex()
+                                    }
                             }
                         }
                         .veloceCard()
