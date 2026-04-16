@@ -609,7 +609,7 @@ final class ExpenseViewModel: ObservableObject {
             .dropFirst()
             .debounce(for: .milliseconds(600), scheduler: RunLoop.main)
             .sink { [weak self] cats, _ in
-                guard let self else { return }
+                guard self != nil else { return }
                 let widgetData = VeloceWidgetData(
                     totalBudget: cats.reduce(0) { $0 + $1.budget },
                     totalSpent:  cats.reduce(0) { $0 + $1.spent  },

@@ -1,4 +1,5 @@
 import SwiftUI
+internal import Speech   // needed for SFSpeechRecognizerAuthorizationStatus in micTapped()
 
 // MARK: - Chat Message
 
@@ -23,10 +24,15 @@ struct AIAssistantView: View {
     /// it does not consume a slot from the free user's 3-message daily allowance.
     var isInsightPrompt: Bool = false
 
-    @State private var messages:        [ChatMessage] = []
-    @State private var inputText        = ""
-    @State private var isThinking       = false
-    @State private var insightFreeUsed  = false   // tracks if the free insight message was spent
+    @State private var messages:             [ChatMessage] = []
+    @State private var inputText             = ""
+    @State private var isThinking            = false
+    @State private var insightFreeUsed       = false
+    /// Populated on appear from InsightEngine — replaces the hardcoded chip list.
+    @State private var suggestionPrompts:    [String]     = []
+    @State private var showMicPermissionAlert = false
+    /// Owns the microphone + speech-recognition pipeline for voice input.
+    @StateObject private var speech = SpeechService()
     @FocusState private var inputFocused: Bool
 
     var body: some View {
@@ -50,11 +56,44 @@ struct AIAssistantView: View {
         .presentationBackground(VeloceTheme.bg)
         .preferredColorScheme(.light)
         .onAppear {
-            sendWelcome()
+            // Restore previous session if one exists; otherwise show fresh welcome.
+            // Avoids the jarring "blank slate" every time the sheet re-opens.
+            let restored = loadPersistedConversation()
+            if restored.isEmpty {
+                sendWelcome()
+            } else {
+                messages = restored
+            }
+            // Build context-aware suggestion chips from live InsightEngine output.
+            suggestionPrompts = buildDynamicSuggestions()
             if let prompt = autoSendPrompt, !prompt.isEmpty {
                 inputText = prompt
                 sendMessage()
             }
+        }
+        .onDisappear {
+            // Save on every dismiss so the next open restores seamlessly.
+            saveConversation()
+        }
+        .task {
+            // Request mic + speech-recognition permissions up front so the
+            // first tap on the mic button doesn't block on a permission dialog.
+            await speech.requestPermissions()
+        }
+        .onChange(of: speech.recognizedText) { _, newText in
+            // Mirror live transcription into the text field so the user can
+            // review/edit before sending.
+            if !newText.isEmpty { inputText = newText }
+        }
+        .alert("Microphone Access", isPresented: $showMicPermissionAlert) {
+            Button("Open Settings") {
+                if let url = URL(string: UIApplication.openSettingsURLString) {
+                    UIApplication.shared.open(url)
+                }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Allow microphone and speech recognition in Settings to use voice input.")
         }
     }
 
@@ -79,14 +118,6 @@ struct AIAssistantView: View {
     private var showSuggestions: Bool {
         !messages.isEmpty && !messages.contains(where: { $0.role == .user })
     }
-
-    private let suggestions = [
-        "How can I save more this month?",
-        "Why did I overspend?",
-        "Give me budget tips",
-        "Which category costs me the most?",
-        "Am I on track with my saving goal?",
-    ]
 
     // MARK: - Message List
 
@@ -138,7 +169,7 @@ struct AIAssistantView: View {
                 .padding(.horizontal, 2)
 
             FlowLayout(spacing: 8) {
-                ForEach(suggestions, id: \.self) { prompt in
+                ForEach(suggestionPrompts, id: \.self) { prompt in
                     Button(action: { sendSuggestion(prompt) }) {
                         Text(prompt)
                             .font(.system(size: 13, weight: .medium))
@@ -163,6 +194,11 @@ struct AIAssistantView: View {
 
     private var inputBar: some View {
         VStack(spacing: 0) {
+            // Live transcription banner — slides in while the mic is recording.
+            if speech.isListening {
+                aiListeningBanner
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
             Divider().overlay(VeloceTheme.divider)
             HStack(spacing: 10) {
                 TextField("Ask about your finances…", text: $inputText, axis: .vertical)
@@ -181,12 +217,22 @@ struct AIAssistantView: View {
                                     .strokeBorder(VeloceTheme.divider, lineWidth: 1)
                             )
                     )
-                sendButton
+                // Mic when idle, send arrow when text has been entered.
+                // This mirrors InputBarView's pattern so the UX is consistent.
+                if inputText.trimmingCharacters(in: .whitespaces).isEmpty {
+                    aiMicButton
+                        .transition(.scale.combined(with: .opacity))
+                } else {
+                    sendButton
+                        .transition(.scale.combined(with: .opacity))
+                }
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 10)
-            .background(.ultraThinMaterial)
         }
+        .background(.ultraThinMaterial)
+        .animation(.spring(response: 0.28, dampingFraction: 0.82), value: speech.isListening)
+        .animation(.spring(response: 0.22), value: inputText.isEmpty)
     }
 
     private var sendButton: some View {
@@ -206,6 +252,64 @@ struct AIAssistantView: View {
 
     private var canSend: Bool {
         !inputText.trimmingCharacters(in: .whitespaces).isEmpty && !isThinking
+    }
+
+    // MARK: - Voice input UI
+
+    private var aiListeningBanner: some View {
+        HStack(spacing: 10) {
+            Circle()
+                .fill(VeloceTheme.over)
+                .frame(width: 7, height: 7)
+            Text(speech.recognizedText.isEmpty ? "Listening…" : speech.recognizedText)
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(VeloceTheme.textPrimary)
+                .lineLimit(1)
+            Spacer()
+            Button("Done") {
+                speech.stopListening()
+                // Commit whatever was transcribed so far
+                if !speech.recognizedText.isEmpty { inputText = speech.recognizedText }
+            }
+            .font(.system(size: 13, weight: .semibold))
+            .foregroundStyle(VeloceTheme.accent)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
+        .background(VeloceTheme.surface.opacity(0.95))
+    }
+
+    private var aiMicButton: some View {
+        Button(action: micTapped) {
+            ZStack {
+                Circle()
+                    .fill(speech.isListening ? VeloceTheme.over : VeloceTheme.surfaceRaised)
+                    .overlay(Circle().strokeBorder(
+                        speech.isListening ? Color.clear : VeloceTheme.divider,
+                        lineWidth: 1
+                    ))
+                    .frame(width: 40, height: 40)
+                Image(systemName: speech.isListening ? "stop.fill" : "mic.fill")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(speech.isListening ? .white : VeloceTheme.textSecondary)
+            }
+        }
+        .animation(.spring(response: 0.2), value: speech.isListening)
+    }
+
+    private func micTapped() {
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        guard speech.authStatus == .authorized else {
+            if speech.authStatus == .denied { showMicPermissionAlert = true }
+            return
+        }
+        if speech.isListening {
+            speech.stopListening()
+            if !speech.recognizedText.isEmpty { inputText = speech.recognizedText }
+        } else {
+            inputText = ""
+            speech.startListening()
+        }
     }
 
     // MARK: - Toolbar
@@ -301,19 +405,37 @@ struct AIAssistantView: View {
     }
 
     private func buildContext() -> AppContext {
-        AppContext(
-            monthlyIncome: vm.monthlyIncome,
-            savingGoal:    vm.savingGoal,
-            totalSpent:    vm.totalSpent,
-            totalBudget:   vm.totalBudget,
-            categories:    vm.categories.map {
+        // Build a fast id→name lookup so the expense loop is O(n) not O(n²).
+        let catMap: [UUID: String] = Dictionary(
+            uniqueKeysWithValues: vm.categories.map { ($0.id, $0.name) }
+        )
+        let fmt = ISO8601DateFormatter()
+        // Send the 60 most recent transactions so the LLM can answer specific
+        // questions ("what did I spend on food this week?", "my biggest expense
+        // yesterday") instead of only seeing monthly totals.
+        let recent: [RecentExpense] = vm.sortedExpenses.prefix(60).map { exp in
+            RecentExpense(
+                title:        exp.title,
+                amount:       exp.amount,
+                categoryName: catMap[exp.categoryId] ?? "Other",
+                date:         fmt.string(from: exp.date)
+            )
+        }
+
+        return AppContext(
+            monthlyIncome:  vm.monthlyIncome,
+            savingGoal:     vm.savingGoal,
+            totalSpent:     vm.totalSpent,
+            totalBudget:    vm.totalBudget,
+            categories:     vm.categories.map {
                 CategoryContext(
                     name:       $0.name,
                     spent:      $0.spent,
                     budget:     $0.budget,
                     spentRatio: $0.spentRatio
                 )
-            }
+            },
+            recentExpenses: recent
         )
     }
 
@@ -418,6 +540,72 @@ struct AIAssistantView: View {
         // Default helpful response
         let pct = budget > 0 ? Int((spent / budget) * 100) : 0
         return "You've spent **\(spent.toCompactCurrency())** this month (\(pct)% of budget). Ask me about your categories, savings, or budget tips!"
+    }
+
+    // MARK: - Dynamic suggestion chips
+
+    /// Pulls AI prompts from the highest-priority InsightCards, then fills any
+    /// remaining slots with static fallbacks. Result is always 3–5 chips.
+    /// Called once on appear so InsightEngine doesn't run on every render.
+    private func buildDynamicSuggestions() -> [String] {
+        let insightPrompts = InsightEngine.generate(
+            expenses:      vm.expenses,
+            categories:    vm.categories,
+            monthlyIncome: vm.monthlyIncome,
+            savingGoal:    vm.savingGoal
+        )
+        .compactMap(\.aiPrompt)   // only cards that have a pre-filled AI prompt
+        .prefix(3)
+
+        // Static fallbacks ensure chips are always present even with zero data.
+        let fallbacks = [
+            "Give me budget tips",
+            "Which category costs me the most?",
+            "Am I on track with my saving goal?",
+            "How can I save more this month?",
+            "Show me my spending breakdown",
+        ]
+
+        var result = Array(insightPrompts)
+        for fb in fallbacks where result.count < 5 {
+            if !result.contains(fb) { result.append(fb) }
+        }
+        return result
+    }
+
+    // MARK: - Conversation persistence
+
+    private static let conversationKey   = "veloce_ai_chat_history"
+    private static let maxPersistedTurns = 20
+
+    /// Lightweight Codable mirror of ChatMessage used only for UserDefaults storage.
+    /// Excludes .error and .debug roles — those are transient UI state, not history.
+    private struct PersistedChatMessage: Codable {
+        let role:    String   // "user" | "assistant"
+        let content: String
+    }
+
+    /// Saves the last `maxPersistedTurns` user/assistant messages to UserDefaults.
+    private func saveConversation() {
+        let saveable = messages
+            .filter { $0.role == .user || $0.role == .assistant }
+            .suffix(Self.maxPersistedTurns)
+            .map { PersistedChatMessage(role: $0.role == .user ? "user" : "assistant",
+                                        content: $0.content) }
+        guard let data = try? JSONEncoder().encode(saveable) else { return }
+        UserDefaults.standard.set(data, forKey: Self.conversationKey)
+    }
+
+    /// Loads the previous conversation. Returns [] on any failure so the caller
+    /// shows a fresh welcome message instead of crashing or showing stale data.
+    private func loadPersistedConversation() -> [ChatMessage] {
+        guard
+            let data     = UserDefaults.standard.data(forKey: Self.conversationKey),
+            let restored = try? JSONDecoder().decode([PersistedChatMessage].self, from: data)
+        else { return [] }
+        return restored.map {
+            ChatMessage(role: $0.role == "user" ? .user : .assistant, content: $0.content)
+        }
     }
 }
 

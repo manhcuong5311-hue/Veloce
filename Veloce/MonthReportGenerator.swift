@@ -120,7 +120,7 @@ enum MonthReportGenerator {
             ("Saving Rate",   String(format: "%.1f%%", savingRate),  UIColor(red: 0.93, green: 0.71, blue: 0.20, alpha: 1)),
         ]
 
-        var curY = y + 12
+        let curY = y + 12
         for (i, (title, value, color)) in cards.enumerated() {
             let col  = i % 2
             let row  = i / 2

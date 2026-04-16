@@ -5,11 +5,15 @@ import FirebaseFunctions
 // MARK: - Context passed to the Cloud Function
 
 struct AppContext: Encodable {
-    let monthlyIncome: Double
-    let savingGoal:    Double
-    let totalSpent:    Double
-    let totalBudget:   Double
-    let categories:    [CategoryContext]
+    let monthlyIncome:  Double
+    let savingGoal:     Double
+    let totalSpent:     Double
+    let totalBudget:    Double
+    let categories:     [CategoryContext]
+    /// Last 60 transactions newest-first. Gives the LLM real data to reason
+    /// about instead of only monthly aggregates — unlocks answers like
+    /// "what did I spend on food this week?" or "my biggest single expense".
+    let recentExpenses: [RecentExpense]
 }
 
 struct CategoryContext: Encodable {
@@ -17,6 +21,13 @@ struct CategoryContext: Encodable {
     let spent:      Double
     let budget:     Double
     let spentRatio: Double
+}
+
+struct RecentExpense: Encodable {
+    let title:        String
+    let amount:       Double
+    let categoryName: String
+    let date:         String   // ISO 8601, e.g. "2026-04-16T09:30:00Z"
 }
 
 // MARK: - Message model
