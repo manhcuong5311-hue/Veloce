@@ -31,7 +31,11 @@ struct SettingsView: View {
     @State private var showRecurring           = false
     @State private var showPDFShareSheet      = false
     @State private var pdfReportURL:          URL?
-    @AppStorage("veloce_icloud_sync") private var iCloudSyncEnabled = false
+    @AppStorage("veloce_icloud_sync")     private var iCloudSyncEnabled   = false
+    @AppStorage("veloce_onboarding_done") private var onboardingDone      = true
+    @State private var versionTapCount   = 0
+    @State private var showOnboarding    = false
+    @State private var showDevMenu       = false
 
     private var selectedCurrency: Binding<AppCurrency> {
         Binding(
@@ -582,25 +586,6 @@ struct SettingsView: View {
                 )
             }
 
-            // Test notification (only when authorized)
-            if notifMgr.authStatus == .authorized {
-                Button(action: { notifMgr.sendTestNotification() }) {
-                    HStack {
-                        Label {
-                            Text("Send Test Notification")
-                                .foregroundStyle(VeloceTheme.textPrimary)
-                        } icon: {
-                            Image(systemName: "bell.badge")
-                                .foregroundStyle(VeloceTheme.accent)
-                        }
-                        Spacer()
-                        Text("~2 sec")
-                            .font(.system(size: 12))
-                            .foregroundStyle(VeloceTheme.textTertiary)
-                    }
-                }
-            }
-
             // Open System Settings link
             Button(action: { notifMgr.openSystemSettings() }) {
                 Label {
@@ -800,13 +785,61 @@ struct SettingsView: View {
 
     private var versionSection: some View {
         Section {
-            HStack {
-                Text("Version")
-                    .foregroundStyle(VeloceTheme.textSecondary)
-                Spacer()
-                Text(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0")
-                    .foregroundStyle(VeloceTheme.textTertiary)
+            // Tap 5× to unlock the developer menu (hidden from normal users)
+            Button {
+                versionTapCount += 1
+                if versionTapCount >= 5 {
+                    versionTapCount = 0
+                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                    showDevMenu = true
+                } else if versionTapCount >= 3 {
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                }
+            } label: {
+                HStack {
+                    Text("Version")
+                        .foregroundStyle(VeloceTheme.textSecondary)
+                    Spacer()
+                    if versionTapCount >= 3 {
+                        Text("\(5 - versionTapCount) more…")
+                            .font(.system(size: 12))
+                            .foregroundStyle(VeloceTheme.accent.opacity(0.7))
+                            .transition(.opacity)
+                    }
+                    Text(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0")
+                        .foregroundStyle(VeloceTheme.textTertiary)
+                }
+                .animation(.easeInOut(duration: 0.15), value: versionTapCount)
             }
+            .buttonStyle(.plain)
+        } footer: {
+            if versionTapCount >= 3 {
+                Text("Keep tapping…")
+                    .font(.system(size: 11))
+                    .foregroundStyle(VeloceTheme.accent.opacity(0.6))
+                    .transition(.opacity)
+            }
+        }
+        // Developer action sheet — 2 options
+        .confirmationDialog("Developer Menu", isPresented: $showDevMenu, titleVisibility: .visible) {
+            Button("Open Onboarding") {
+                showOnboarding = true
+            }
+            Button("Test Notification") {
+                Task {
+                    if notifMgr.authStatus != .authorized {
+                        let granted = await notifMgr.requestPermission()
+                        guard granted else { notifMgr.openSystemSettings(); return }
+                    }
+                    notifMgr.sendTestNotification()
+                }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("These options are for development only.")
+        }
+        .fullScreenCover(isPresented: $showOnboarding) {
+            OnboardingView()
         }
     }
 

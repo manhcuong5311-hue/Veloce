@@ -124,52 +124,155 @@ enum AIService {
     // Returns nil when no keyword matches — caller should ask user to pick a group.
 
     private static func detectCategory(from text: String) -> String? {
-        // Priority-ordered keyword rules for default category names.
-        // The ViewModel layer also fuzzy-matches against user's actual category names.
+        // Priority-ordered keyword rules covering all 10 app languages:
+        // Vietnamese, English (US/UK), Chinese (Simplified), Japanese,
+        // Korean, French, Spanish, Thai, German.
         let rules: [(String, [String])] = [
             ("Food", [
+                // 🇻🇳 Vietnamese
                 "ăn", "cơm", "phở", "bún", "cháo", "bánh", "bún bò", "bún chả",
                 "café", "cafe", "coffee", "trà", "trà sữa", "boba", "matcha",
                 "pizza", "burger", "sushi", "lẩu", "gà", "hải sản", "cá",
                 "mì", "hủ tiếu", "bánh mì", "xôi", "chè", "nước", "nước ngọt",
-                "milk tea", "breakfast", "lunch", "dinner", "snack", "kem",
-                "siêu thị", "grocery", "market", "kfc", "mcdonald", "jollibee",
-                "eat", "food", "drink", "restaurant", "cafe",
+                "siêu thị", "kfc", "mcdonald", "jollibee", "snack", "kem",
+                // 🇺🇸🇬🇧 English
+                "eat", "food", "drink", "restaurant", "grocery", "market",
+                "breakfast", "lunch", "dinner", "milk tea", "bubble tea",
+                // 🇨🇳 Chinese
+                "吃", "饭", "餐", "咖啡", "早餐", "午餐", "晚餐", "零食", "超市",
+                "奶茶", "外卖", "火锅", "面", "饮料",
+                // 🇯🇵 Japanese
+                "食べ", "ランチ", "ご飯", "カフェ", "コーヒー", "レストラン",
+                "朝食", "昼食", "夕食", "スーパー", "弁当", "お茶", "居酒屋",
+                // 🇰🇷 Korean
+                "식사", "밥", "카페", "커피", "점심", "저녁", "아침", "음식", "마트",
+                "분식", "치킨", "삼겹살", "라면",
+                // 🇫🇷 French
+                "manger", "repas", "déjeuner", "dîner", "petit-déjeuner",
+                "épicerie", "boulangerie", "brasserie",
+                // 🇪🇸 Spanish
+                "comer", "comida", "almuerzo", "cena", "desayuno",
+                "supermercado", "taquería",
+                // 🇹🇭 Thai
+                "อาหาร", "กาแฟ", "ข้าว", "ร้านอาหาร", "ตลาด", "ชา", "ข้าวมันไก่",
+                // 🇩🇪 German
+                "essen", "mahlzeit", "kaffee", "frühstück", "mittagessen",
+                "abendessen", "supermarkt", "bäckerei",
             ]),
             ("Transport", [
-                "grab", "uber", "taxi", "xe ôm", "xeom", "gojek", "be ",
-                "bus", "buýt", "tàu", "tàu điện", "metro", "vé tàu", "vé xe",
-                "xăng", "petrol", "gas", "đổ xăng", "bãi xe", "parking",
-                "máy bay", "vé máy bay", "flight", "grab bike", "grab car",
-                "lyft", "transport", "fare", "fuel",
+                // 🇻🇳 Vietnamese
+                "grab", "gojek", "be ", "xe ôm", "xeom",
+                "buýt", "tàu", "tàu điện", "metro", "vé tàu", "vé xe",
+                "xăng", "đổ xăng", "bãi xe", "máy bay", "vé máy bay",
+                // 🇺🇸🇬🇧 English
+                "uber", "lyft", "taxi", "bus", "subway", "train", "flight",
+                "petrol", "gas", "fuel", "parking", "fare", "transport",
+                "grab bike", "grab car",
+                // 🇨🇳 Chinese
+                "打车", "地铁", "公交", "出租车", "加油", "滴滴", "高铁", "机票",
+                // 🇯🇵 Japanese
+                "電車", "バス", "タクシー", "地下鉄", "ガソリン", "新幹線", "飛行機代",
+                // 🇰🇷 Korean
+                "택시", "버스", "지하철", "주유", "기차", "항공",
+                // 🇫🇷 French
+                "transport", "métro", "essence", "train", "avion", "vélo",
+                // 🇪🇸 Spanish
+                "transporte", "gasolina", "autobús", "metro", "vuelo",
+                // 🇹🇭 Thai
+                "รถ", "แท็กซี่", "รถไฟ", "น้ำมัน", "mrt", "bts", "สกายทรัน",
+                // 🇩🇪 German
+                "bahn", "benzin", "tankstelle", "flug", "ubahn",
             ]),
             ("Shopping", [
+                // 🇻🇳 Vietnamese
                 "mua", "shop", "quần", "áo", "giày", "dép", "túi", "ví",
-                "fashion", "clothes", "clothing", "zara", "h&m", "uniqlo", "muji",
-                "lazada", "shopee", "tiki", "amazon", "order", "haul",
-                "đồng hồ", "nhẫn", "trang sức", "phụ kiện", "case phone",
-                "buy", "purchase",
+                "lazada", "shopee", "tiki", "đồng hồ", "nhẫn", "trang sức",
+                "phụ kiện", "case phone",
+                // 🇺🇸🇬🇧 English
+                "buy", "purchase", "clothes", "clothing", "fashion", "shoes",
+                "amazon", "order", "haul", "zara", "h&m", "uniqlo", "muji",
+                // 🇨🇳 Chinese
+                "买", "购物", "衣服", "鞋", "淘宝", "京东", "天猫", "包",
+                // 🇯🇵 Japanese
+                "買い物", "ショッピング", "服", "靴", "バッグ", "楽天", "アマゾン",
+                // 🇰🇷 Korean
+                "쇼핑", "옷", "신발", "구매", "쿠팡",
+                // 🇫🇷 French
+                "shopping", "acheter", "vêtements", "chaussures", "sac",
+                // 🇪🇸 Spanish
+                "compras", "comprar", "ropa", "zapatos", "bolsa",
+                // 🇹🇭 Thai
+                "ช้อปปิ้ง", "เสื้อผ้า", "รองเท้า", "กระเป๋า",
+                // 🇩🇪 German
+                "einkaufen", "kleidung", "schuhe", "tasche",
             ]),
             ("Bills", [
+                // 🇻🇳 Vietnamese
                 "điện", "wifi", "internet", "4g", "5g",
-                "bill", "hoá đơn", "rent", "thuê nhà", "phòng trọ",
-                "phone bill", "bảo hiểm", "tiền nhà",
-                "insurance", "subscription", "icloud", "google one",
-                "electric", "utility", "water bill",
+                "hoá đơn", "thuê nhà", "phòng trọ", "bảo hiểm", "tiền nhà",
+                // 🇺🇸🇬🇧 English
+                "bill", "rent", "insurance", "subscription", "electric",
+                "utility", "water bill", "phone bill", "icloud", "google one",
+                // 🇨🇳 Chinese
+                "电费", "网费", "租金", "房租", "保险", "话费", "水费", "物业",
+                // 🇯🇵 Japanese
+                "電気代", "ネット代", "家賃", "保険", "携帯代", "水道代",
+                // 🇰🇷 Korean
+                "전기세", "인터넷", "집세", "보험", "휴대폰", "관리비",
+                // 🇫🇷 French
+                "facture", "loyer", "électricité", "assurance", "abonnement",
+                // 🇪🇸 Spanish
+                "factura", "alquiler", "electricidad", "seguro", "suscripción",
+                // 🇹🇭 Thai
+                "ค่าไฟ", "ค่าน้ำ", "ค่าเช่า", "ประกัน", "อินเทอร์เน็ต",
+                // 🇩🇪 German
+                "rechnung", "miete", "strom", "versicherung", "abonnement",
             ]),
             ("Health", [
-                "gym", "fitness", "yoga", "pilates", "thể dục",
-                "thuốc", "bác sĩ", "bệnh viện", "khám", "khám bệnh",
-                "hospital", "doctor", "clinic", "pharmacy", "nhà thuốc",
+                // 🇻🇳 Vietnamese
+                "gym", "thể dục", "yoga", "pilates",
+                "thuốc", "bác sĩ", "bệnh viện", "khám", "nhà thuốc",
                 "vitamin", "supplement", "thực phẩm chức năng",
+                // 🇺🇸🇬🇧 English
+                "fitness", "hospital", "doctor", "clinic", "pharmacy",
                 "medicine", "dental", "health",
+                // 🇨🇳 Chinese
+                "健身", "医院", "药店", "看病", "医生", "药", "体检",
+                // 🇯🇵 Japanese
+                "ジム", "病院", "薬局", "医者", "薬", "歯医者", "健康診断",
+                // 🇰🇷 Korean
+                "헬스장", "병원", "약국", "의사", "약", "치과",
+                // 🇫🇷 French
+                "hôpital", "médecin", "pharmacie", "médicament", "dentiste",
+                // 🇪🇸 Spanish
+                "gimnasio", "hospital", "médico", "farmacia", "medicina",
+                // 🇹🇭 Thai
+                "ฟิตเนส", "โรงพยาบาล", "หมอ", "ยา", "ร้านขายยา",
+                // 🇩🇪 German
+                "fitnessstudio", "krankenhaus", "arzt", "apotheke", "medikament",
             ]),
             ("Entertainment", [
-                "phim", "cinema", "bhd", "lotte", "movie",
-                "game", "steam", "netflix", "spotify", "youtube premium",
-                "concert", "show", "karaoke", "bowling", "billiards",
-                "vé", "ticket", "giải trí", "sách", "book",
-                "entertainment", "music", "disney",
+                // 🇻🇳 Vietnamese
+                "phim", "cinema", "bhd", "lotte", "karaoke",
+                "game", "giải trí", "sách", "vé", "bowling", "billiards",
+                // 🇺🇸🇬🇧 English
+                "movie", "music", "concert", "show", "ticket", "book",
+                "netflix", "spotify", "steam", "disney", "youtube premium",
+                "entertainment",
+                // 🇨🇳 Chinese
+                "电影", "游戏", "音乐", "演唱会", "书", "ktv",
+                // 🇯🇵 Japanese
+                "映画", "ゲーム", "音楽", "コンサート", "カラオケ", "本",
+                // 🇰🇷 Korean
+                "영화", "게임", "음악", "콘서트", "노래방", "책",
+                // 🇫🇷 French
+                "cinéma", "jeu", "musique", "concert", "livre",
+                // 🇪🇸 Spanish
+                "cine", "juego", "música", "concierto", "libro",
+                // 🇹🇭 Thai
+                "หนัง", "เกม", "เพลง", "คอนเสิร์ต", "หนังสือ",
+                // 🇩🇪 German
+                "kino", "spiel", "musik", "konzert", "buch",
             ]),
         ]
 

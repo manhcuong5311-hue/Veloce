@@ -9,6 +9,7 @@ struct InputBarView: View {
     @FocusState private var textFocused: Bool
     @State private var showPermissionAlert = false
     @State private var parseFailed         = false
+    @State private var isParsing           = false
     @State private var pendingParsed: ParsedExpense? = nil
 
     var onAITap:       () -> Void = {}
@@ -139,13 +140,20 @@ struct InputBarView: View {
         Button(action: submit) {
             ZStack {
                 Circle()
-                    .fill(VeloceTheme.accent)
+                    .fill(isParsing ? VeloceTheme.accent.opacity(0.6) : VeloceTheme.accent)
                     .frame(width: 44, height: 44)
-                Image(systemName: "arrow.up")
-                    .font(.system(size: 16, weight: .bold))
-                    .foregroundStyle(.white)
+                if isParsing {
+                    ProgressView()
+                        .tint(.white)
+                        .scaleEffect(0.75)
+                } else {
+                    Image(systemName: "arrow.up")
+                        .font(.system(size: 16, weight: .bold))
+                        .foregroundStyle(.white)
+                }
             }
         }
+        .disabled(isParsing)
     }
 
     private var micButton: some View {
@@ -179,15 +187,34 @@ struct InputBarView: View {
 
     private func submit() {
         let trimmed = text.trimmingCharacters(in: .whitespaces)
-        guard !trimmed.isEmpty else { return }
+        guard !trimmed.isEmpty, !isParsing else { return }
         speech.stopListening()
 
+        isParsing = true
+        Task { await doParseAndApply(trimmed) }
+    }
+
+    @MainActor
+    private func doParseAndApply(_ trimmed: String) async {
+        defer { isParsing = false }
+
+        // Cloud-first: attempt the LLM parser; fall through to local on any error.
+        let catNames = vm.categories.map { $0.name }
+        if let parsed = try? await OpenAIService.parseExpense(
+            text:          trimmed,
+            categoryNames: catNames,
+            categories:    vm.categories
+        ) {
+            applyParsed(parsed)
+            return
+        }
+
+        // Local fallback — rule-based NLP already in the app.
         switch vm.parseExpenseResult(from: trimmed) {
         case .added:
-            text = ""
+            text        = ""
             textFocused = false
         case .needsCategory(let parsed):
-            // Show category picker — keep text visible until user picks
             pendingParsed = parsed
         case .failed:
             withAnimation { parseFailed = true }
@@ -196,6 +223,31 @@ struct InputBarView: View {
                 try? await Task.sleep(nanoseconds: 1_200_000_000)
                 withAnimation { parseFailed = false }
             }
+        }
+    }
+
+    /// Applies a `ParsedExpense` that already has a resolved (or nil) category name.
+    private func applyParsed(_ parsed: ParsedExpense) {
+        // Map the category name returned by the cloud to an actual UUID.
+        let catId: UUID? = parsed.categoryName.flatMap { name in
+            vm.categories.first(where: {
+                $0.name.lowercased() == name.lowercased()
+            })?.id
+        }
+
+        if let id = catId {
+            vm.addExpense(Expense(
+                title:      parsed.title,
+                amount:     parsed.amount,
+                categoryId: id,
+                date:       parsed.date
+            ))
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
+            text        = ""
+            textFocused = false
+        } else {
+            // Category unclear — let user pick.
+            pendingParsed = parsed
         }
     }
 

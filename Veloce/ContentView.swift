@@ -164,6 +164,7 @@ struct ContentView: View {
             RatingManager.shared.recordActiveDay()
             vm.processOverdueRecurring()
             checkDay7Paywall()
+            checkWeeklyDigest()
         }
         .onChange(of: scenePhase) { _, phase in
             if phase == .active {
@@ -188,6 +189,32 @@ struct ContentView: View {
         DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
             showPaywall = true
         }
+    }
+
+    /// Schedules a local weekly digest notification once per calendar week.
+    /// Safe to call on every onAppear — UserDefaults deduplication makes it a no-op
+    /// for the rest of the week after the first call.
+    private func checkWeeklyDigest() {
+        let key = "veloce_weekly_digest_\(currentWeekKey())"
+        guard !UserDefaults.standard.bool(forKey: key) else { return }
+        UserDefaults.standard.set(true, forKey: key)
+
+        let topCategory = vm.categories
+            .filter { $0.spent > 0 }
+            .max(by: { $0.spent < $1.spent })?
+            .name
+
+        notifMgr.scheduleWeeklyDigest(
+            totalSpent:  vm.totalSpent,
+            totalBudget: vm.totalBudget,
+            topCategory: topCategory
+        )
+    }
+
+    private func currentWeekKey() -> String {
+        let cal   = Calendar.current
+        let comps = cal.dateComponents([.yearForWeekOfYear, .weekOfYear], from: Date())
+        return "\(comps.yearForWeekOfYear ?? 0)-W\(comps.weekOfYear ?? 0)"
     }
 
     private func handleAITap() {

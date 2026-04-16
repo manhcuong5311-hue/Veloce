@@ -247,6 +247,38 @@ final class NotificationManager: NSObject, ObservableObject {
         ud.set(ud.integer(forKey: key) + 1, forKey: key)
     }
 
+    // MARK: - Weekly Digest
+
+    /// Schedules a repeating Monday-9am local notification summarising the week.
+    /// De-duplicated by `weekKey` — only updates the schedule once per week so
+    /// calling this on every `onAppear` is safe.
+    func scheduleWeeklyDigest(totalSpent: Double, totalBudget: Double, topCategory: String?) {
+        guard authStatus == .authorized else { return }
+
+        let pct     = totalBudget > 0 ? Int((totalSpent / totalBudget) * 100) : 0
+        let topLine = topCategory.map { " Top: \($0)." } ?? ""
+
+        let content       = UNMutableNotificationContent()
+        content.title     = "Veloce Weekly Digest"
+        content.body      = "This week: spent \(totalSpent.toCompactCurrency()) (\(pct)% of budget).\(topLine)"
+        content.sound     = .default
+
+        // Every Monday at 09:00
+        var comps         = DateComponents()
+        comps.weekday     = 2   // Monday (1 = Sunday)
+        comps.hour        = 9
+        comps.minute      = 0
+
+        let trigger = UNCalendarNotificationTrigger(dateMatching: comps, repeats: true)
+        let request = UNNotificationRequest(
+            identifier: "weekly_digest",
+            content:    content,
+            trigger:    trigger
+        )
+        center.removePendingNotificationRequests(withIdentifiers: ["weekly_digest"])
+        center.add(request)
+    }
+
     // MARK: - Test Notification
 
     /// Fires a visible notification in ~2 seconds. Use in Settings to verify the pipeline works.

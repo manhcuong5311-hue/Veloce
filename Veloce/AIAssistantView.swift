@@ -7,7 +7,8 @@ struct ChatMessage: Identifiable, Equatable {
     let id        = UUID()
     let role:      Role
     let content:   String
-    let timestamp: Date = Date()
+    let timestamp: Date      = Date()
+    var actions:   [AIAction] = []
 
     enum Role { case user, assistant, error, debug }
 }
@@ -126,7 +127,7 @@ struct AIAssistantView: View {
             ScrollView(showsIndicators: false) {
                 LazyVStack(spacing: 12) {
                     ForEach(messages) { msg in
-                        MessageBubble(message: msg)
+                        MessageBubble(message: msg, onAction: handleAction)
                             .id(msg.id)
                     }
                     // Suggestion chips — shown before the first user message
@@ -371,7 +372,9 @@ struct AIAssistantView: View {
                     messages: buildAPIMessages(userText: text),
                     context:  buildContext()
                 )
-                messages.append(ChatMessage(role: .assistant, content: response))
+                var msg = ChatMessage(role: .assistant, content: response.content)
+                msg.actions = response.actions
+                messages.append(msg)
             } catch {
                 // Show what went wrong so the user/developer can diagnose it,
                 // then fall back to a rule-based local answer.
@@ -381,6 +384,33 @@ struct AIAssistantView: View {
                 messages.append(ChatMessage(role: .assistant, content: local))
             }
             isThinking = false
+        }
+    }
+
+    // MARK: - Action handler
+
+    /// Called when the user taps an action button inside an AI bubble.
+    private func handleAction(_ action: AIAction) {
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        switch action.type {
+        case "adjust_budget":
+            guard
+                let catName   = action.categoryName,
+                let newBudget = action.suggestedAmount, newBudget > 0,
+                let cat       = vm.categories.first(where: {
+                    $0.name.lowercased() == catName.lowercased()
+                })
+            else { return }
+            vm.updateBudget(categoryId: cat.id, newBudget: newBudget)
+            messages.append(ChatMessage(
+                role: .assistant,
+                content: "Done! **\(catName)** budget updated to \(newBudget.toCompactCurrency())."
+            ))
+        case "open_category":
+            // Dismiss the AI sheet so the user lands on the main screen.
+            dismiss()
+        default:
+            break
         }
     }
 
@@ -612,7 +642,8 @@ struct AIAssistantView: View {
 // MARK: - Message Bubble
 
 private struct MessageBubble: View {
-    let message: ChatMessage
+    let message:  ChatMessage
+    var onAction: ((AIAction) -> Void)? = nil
 
     var body: some View {
         // Debug notes render as a slim inline banner (not a full bubble)
@@ -632,31 +663,92 @@ private struct MessageBubble: View {
                         in: RoundedRectangle(cornerRadius: 10, style: .continuous))
             .frame(maxWidth: .infinity, alignment: .leading)
         } else {
-            HStack(alignment: .bottom, spacing: 8) {
-                if message.role == .user { Spacer(minLength: 48) }
+            VStack(alignment: message.role == .user ? .trailing : .leading, spacing: 6) {
+                HStack(alignment: .bottom, spacing: 8) {
+                    if message.role == .user { Spacer(minLength: 48) }
 
-                if message.role != .user {
-                    ZStack {
-                        Circle()
-                            .fill(VeloceTheme.accentBg)
-                            .frame(width: 30, height: 30)
-                        Image(systemName: message.role == .error ? "exclamationmark.triangle.fill" : "sparkles")
-                            .font(.system(size: 12, weight: .semibold))
-                            .foregroundStyle(message.role == .error ? VeloceTheme.over : VeloceTheme.accent)
+                    if message.role != .user {
+                        ZStack {
+                            Circle()
+                                .fill(VeloceTheme.accentBg)
+                                .frame(width: 30, height: 30)
+                            Image(systemName: message.role == .error ? "exclamationmark.triangle.fill" : "sparkles")
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundStyle(message.role == .error ? VeloceTheme.over : VeloceTheme.accent)
+                        }
+                        .alignmentGuide(.bottom) { d in d[.bottom] }
                     }
-                    .alignmentGuide(.bottom) { d in d[.bottom] }
+
+                    // Text bubble — must constrain width so long content wraps
+                    // instead of growing off screen. `.fixedSize(vertical: true)`
+                    // lets the bubble grow as tall as needed while respecting the
+                    // horizontal space left by the Spacer on the opposite side.
+                    Text(LocalizedStringKey(message.content))
+                        .font(.system(size: 14))
+                        .foregroundStyle(bubbleForeground)
+                        .multilineTextAlignment(message.role == .user ? .trailing : .leading)
+                        .lineLimit(nil)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 10)
+                        .background(bubbleBackground, in: bubbleShape)
+                        // Cap width so a single very long word / URL can't push
+                        // the bubble edge off screen on narrow devices.
+                        .frame(maxWidth: UIScreen.main.bounds.width * 0.72,
+                               alignment: message.role == .user ? .trailing : .leading)
+
+                    if message.role != .user { Spacer(minLength: 48) }
                 }
 
-                Text(LocalizedStringKey(message.content))
-                    .font(.system(size: 14))
-                    .foregroundStyle(bubbleForeground)
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 10)
-                    .background(bubbleBackground, in: bubbleShape)
-                    .fixedSize(horizontal: false, vertical: true)
-
-                if message.role != .user { Spacer(minLength: 48) }
+                // Action buttons — shown below assistant bubbles when AI suggests an action
+                if message.role == .assistant, !message.actions.isEmpty {
+                    VStack(alignment: .leading, spacing: 6) {
+                        ForEach(message.actions, id: \.self) { action in
+                            Button {
+                                onAction?(action)
+                            } label: {
+                                HStack(spacing: 6) {
+                                    Image(systemName: actionIcon(action))
+                                        .font(.system(size: 12, weight: .semibold))
+                                    Text(actionLabel(action))
+                                        .font(.system(size: 13, weight: .semibold))
+                                        .lineLimit(2)
+                                        .fixedSize(horizontal: false, vertical: true)
+                                }
+                                .foregroundStyle(.white)
+                                .padding(.horizontal, 14)
+                                .padding(.vertical, 8)
+                                .background(VeloceTheme.accent, in: Capsule())
+                            }
+                            .buttonStyle(.plain)
+                            .padding(.leading, 38) // align under bubble (past avatar)
+                        }
+                    }
+                }
             }
+            .frame(maxWidth: .infinity,
+                   alignment: message.role == .user ? .trailing : .leading)
+        }
+    }
+
+    private func actionLabel(_ action: AIAction) -> String {
+        switch action.type {
+        case "adjust_budget":
+            let cat    = action.categoryName ?? "budget"
+            let amount = action.suggestedAmount.map { " → \($0.toCompactCurrency())" } ?? ""
+            return "Adjust \(cat)\(amount)"
+        case "open_category":
+            return "View \(action.categoryName ?? "category")"
+        default:
+            return action.reason ?? "Take action"
+        }
+    }
+
+    private func actionIcon(_ action: AIAction) -> String {
+        switch action.type {
+        case "adjust_budget":  return "slider.horizontal.3"
+        case "open_category":  return "arrow.right.circle"
+        default:               return "bolt.fill"
         }
     }
 
