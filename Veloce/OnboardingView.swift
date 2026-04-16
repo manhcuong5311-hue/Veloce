@@ -190,16 +190,17 @@ private struct Page2: View {
 
                 VStack(spacing: 14) {
                     setupField(
-                        label:       "Monthly income",
-                        placeholder: "e.g. 15,000,000",
-                        icon:        "banknote",
-                        text:        $income
+                        label: String(localized: "monthly_income"),
+                        placeholder: String(localized: "monthly_income_placeholder"),
+                        icon: "banknote",
+                        text: $income
                     )
+
                     setupField(
-                        label:       "Monthly savings goal",
-                        placeholder: "e.g. 3,000,000",
-                        icon:        "target",
-                        text:        $savingsGoal
+                        label: String(localized: "monthly_savings_goal"),
+                        placeholder: String(localized: "monthly_savings_goal_placeholder"),
+                        icon: "target",
+                        text: $savingsGoal
                     )
                 }
                 .opacity(show ? 1 : 0)
@@ -211,10 +212,14 @@ private struct Page2: View {
             Spacer()
 
             VStack(spacing: 13) {
-                primaryButton("Continue", action: onContinue)
+                primaryButton(
+                    String(localized: "continue"),
+                    action: onContinue
+                )
+
 
                 Button(action: onSkip) {
-                    Text("Skip for now")
+                    Text(String(localized: "skip_for_now"))
                         .font(.system(size: 15, weight: .medium))
                         .foregroundStyle(VeloceTheme.textTertiary)
                 }
@@ -293,7 +298,7 @@ private struct PageNotification: View {
                 .opacity(show ? 1 : 0)
 
                 VStack(spacing: 16) {
-                    Text("Stay on track\nwith your spending")
+                    Text(String(localized: "stay_on_track_title"))
                         .font(.system(size: 34, weight: .bold, design: .rounded))
                         .foregroundStyle(VeloceTheme.textPrimary)
                         .multilineTextAlignment(.center)
@@ -301,7 +306,7 @@ private struct PageNotification: View {
                         .offset(y: show ? 0 : 18)
                         .opacity(show ? 1 : 0)
 
-                    Text("Get gentle reminders to log expenses\nand track your budget.")
+                    Text(String(localized: "stay_on_track_description"))
                         .font(.system(size: 16))
                         .foregroundStyle(VeloceTheme.textSecondary)
                         .multilineTextAlignment(.center)
@@ -322,12 +327,12 @@ private struct PageNotification: View {
                             Text("Veloce")
                                 .font(.system(size: 12, weight: .semibold))
                                 .foregroundStyle(VeloceTheme.textPrimary)
-                            Text("Did you log your spending today?")
+                            Text(String(localized: "log_spending_today"))
                                 .font(.system(size: 12))
                                 .foregroundStyle(VeloceTheme.textSecondary)
                         }
                         Spacer()
-                        Text("now")
+                        Text(String(localized: "now"))
                             .font(.system(size: 11))
                             .foregroundStyle(VeloceTheme.textTertiary)
                     }
@@ -347,10 +352,13 @@ private struct PageNotification: View {
             Spacer()
 
             VStack(spacing: 13) {
-                primaryButton("Enable Notifications", action: onEnable)
+                primaryButton(
+                    String(localized: "enable_notifications"),
+                    action: onEnable
+                )
 
                 Button(action: onSkip) {
-                    Text("Maybe Later")
+                    Text(String(localized: "maybe_later"))
                         .font(.system(size: 15, weight: .medium))
                         .foregroundStyle(VeloceTheme.textTertiary)
                 }
@@ -412,13 +420,16 @@ private struct Page3: View {
                 .animation(.spring(response: 0.3), value: speech.isListening)
 
                 VStack(spacing: 12) {
-                    Text("Give it a try")
+                    Text(String(localized: "give_it_a_try"))
                         .font(.system(size: 36, weight: .bold, design: .rounded))
                         .foregroundStyle(VeloceTheme.textPrimary)
 
-                    Text(speech.isListening
-                         ? "Listening… tap the mic to stop"
-                         : "Tap the mic to speak, or type an expense below")
+                    Text(
+                        speech.isListening
+                        ? String(localized: "speech_listening")
+                        : String(localized: "speech_idle")
+                    )
+
                         .font(.system(size: 15))
                         .foregroundStyle(VeloceTheme.textSecondary)
                         .multilineTextAlignment(.center)
@@ -442,7 +453,10 @@ private struct Page3: View {
                             .symbolEffect(.variableColor, isActive: speech.isListening)
                             .animation(.default, value: loading)
 
-                        TextField("coffee 40k", text: $input)
+                        TextField(
+                            String(localized: "expense_input_placeholder"),
+                            text: $input
+                        )
                             .font(.system(size: 16, design: .rounded))
                             .foregroundStyle(VeloceTheme.textPrimary)
                             .focused($focused)
@@ -502,7 +516,9 @@ private struct Page3: View {
             Spacer()
 
             primaryButton(
-                parsedResult != nil ? "Start Tracking" : "Skip to App",
+                parsedResult != nil
+                ? String(localized: "start_tracking")
+                : String(localized: "skip_to_app"),
                 action: onFinish
             )
             .padding(.horizontal, 28)
@@ -553,9 +569,20 @@ private struct Page3: View {
                     let amt = parsed.amount >= 1_000
                         ? parsed.amount.toCompactCurrency()
                         : parsed.amount.toCurrencyString()
-                    parsedResult = "Added: \(parsed.title.capitalized) — \(amt)"
+
+                    parsedResult = String(
+                        localized: "expense_added_with_amount",
+                        defaultValue: "Added: \(parsed.title.capitalized) — \(amt)",
+                        table: nil,
+                        comment: "Expense added with amount"
+                    )
+
                 } else {
-                    parsedResult = "Added: \(text.capitalized)"
+                    parsedResult = String(
+                        localized: "expense_added_simple",
+                        defaultValue: "Added: \(text.capitalized)",
+                        comment: "Expense added without parsed amount"
+                    )
                 }
             }
             loading = false
