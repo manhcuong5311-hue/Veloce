@@ -31,8 +31,13 @@ struct AuthView: View {
         }
         .preferredColorScheme(.dark)
         .onAppear { animateEntrance() }
-        .alert("Sign In Error", isPresented: .constant(authVM.errorMessage != nil)) {
-            Button("OK") { authVM.errorMessage = nil }
+        .alert(
+            String(localized: "auth.error.signin.title"),
+            isPresented: .constant(authVM.errorMessage != nil)
+        ) {
+            Button(String(localized: "common.ok")) {
+                authVM.errorMessage = nil
+            }
         } message: {
             Text(authVM.errorMessage ?? "")
         }
@@ -124,8 +129,8 @@ struct AuthView: View {
 
             // ── Google ─────────────────────────────────────────
             darkAuthButton(
-                label: "Continue with Google",
-                icon:  "globe"
+                label: String(localized: "auth.continue.google"),
+                icon: "globe"
             ) {
                 Task { await authVM.signInWithGoogle() }
             }
@@ -135,7 +140,7 @@ struct AuthView: View {
                 Rectangle()
                     .fill(.white.opacity(0.08))
                     .frame(height: 1)
-                Text("or")
+                Text(String(localized: "common.or"))
                     .font(.system(size: 12, weight: .medium))
                     .foregroundStyle(.white.opacity(0.25))
                     .fixedSize()
@@ -160,7 +165,7 @@ struct AuthView: View {
                         showEmailForm = true
                     }
                 }) {
-                    Text("Continue with Email")
+                    Text(String(localized: "auth.continue.email"))
                         .font(.system(size: 15, weight: .medium))
                         .foregroundStyle(.white.opacity(0.45))
                 }
@@ -176,12 +181,24 @@ struct AuthView: View {
     @ViewBuilder
     private var emailForm: some View {
         VStack(spacing: 10) {
-            authTextField("Email", text: $email, icon: "envelope",
-                          keyboard: .emailAddress, content: .emailAddress, secure: false)
+            
+            authTextField(
+                String(localized: "auth.field.email"),
+                text: $email,
+                icon: "envelope",
+                keyboard: .emailAddress,
+                content: .emailAddress,
+                secure: false
+            )
 
-            authTextField("Password", text: $password, icon: "lock",
-                          keyboard: .default,
-                          content: isSignUp ? .newPassword : .password, secure: true)
+            authTextField(
+                String(localized: "auth.field.password"),
+                text: $password,
+                icon: "lock",
+                keyboard: .default,
+                content: isSignUp ? .newPassword : .password,
+                secure: true
+            )
 
             // Primary CTA
             Button(action: handleEmailAuth) {
@@ -200,7 +217,12 @@ struct AuthView: View {
                     if authVM.isLoading {
                         ProgressView().tint(.white)
                     } else {
-                        Text(isSignUp ? "Create Account" : "Sign In")
+                        Text(
+                            isSignUp
+                            ? String(localized: "auth.cta.create_account")
+                            : String(localized: "auth.cta.sign_in")
+                        )
+
                             .font(.system(size: 16, weight: .semibold))
                             .foregroundStyle(.white)
                     }
@@ -216,8 +238,8 @@ struct AuthView: View {
             }) {
                 Text(
                     isSignUp
-                    ? "Already have an account? **Sign In**"
-                    : "New here? **Create Account**"
+                    ? String(localized: "auth.switch.to_signin")
+                    : String(localized: "auth.switch.to_signup")
                 )
                 .font(.system(size: 13))
                 .foregroundStyle(.white.opacity(0.38))

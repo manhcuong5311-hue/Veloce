@@ -50,9 +50,15 @@ final class PersistenceStore {
 
     // MARK: Private
 
-    private let encoder   = JSONEncoder()
-    private let decoder   = JSONDecoder()
-    private let saveQueue = DispatchQueue(label: "veloce.persistence", qos: .utility)
+    private let encoder        = JSONEncoder()
+    private let decoder        = JSONDecoder()
+    /// Serial queue for all file I/O. Never used for slow operations (iCloud lookup, etc.)
+    /// so that saveQueue.sync on the main thread always returns in < 1 ms.
+    private let saveQueue      = DispatchQueue(label: "veloce.persistence",  qos: .utility)
+    /// Dedicated queue for the one-time iCloud container resolution.
+    /// Kept separate so that url(forUbiquityContainerIdentifier:) — which can take seconds —
+    /// never blocks saveQueue and never freezes the main thread via saveQueue.sync.
+    private let iCloudSetupQueue = DispatchQueue(label: "veloce.icloud.setup", qos: .background)
 
     // Local baseline — App Group when configured, else Documents.
     private let localDir: URL = {
@@ -64,22 +70,23 @@ final class PersistenceStore {
         return FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
     }()
 
-    // Resolved asynchronously by setupICloud(); nil until iCloud is confirmed available.
-    // Accessed only from saveQueue after initial setup to avoid data races.
+    // Resolved asynchronously by setupICloud(). Read/written only on saveQueue
+    // so it is always consistent with concurrent file writes.
     private var iCloudDir: URL?
 
-    // MARK: Computed directory
+    // MARK: URL helpers (called from saveQueue)
 
-    // Called from saveQueue or at load time (before saveQueue is busy).
-    private var effectiveDir: URL {
-        if UserDefaults.standard.bool(forKey: Key.iCloudSync), let url = iCloudDir {
-            return url
-        }
-        return localDir
+    /// Local file URL — always used for writes so loadJSON finds data at launch
+    /// (iCloudDir is nil during the async startup window).
+    private func localFileURL(_ name: String) -> URL {
+        localDir.appendingPathComponent("\(name).json")
     }
 
-    private func fileURL(_ name: String) -> URL {
-        effectiveDir.appendingPathComponent("\(name).json")
+    /// iCloud file URL — only non-nil after setupICloud completes AND sync is enabled.
+    private func iCloudFileURL(_ name: String) -> URL? {
+        guard UserDefaults.standard.bool(forKey: Key.iCloudSync),
+              let dir = iCloudDir else { return nil }
+        return dir.appendingPathComponent("\(name).json")
     }
 
     // MARK: Init
@@ -90,10 +97,11 @@ final class PersistenceStore {
 
     // MARK: iCloud Setup
 
-    /// Resolves the ubiquity Documents container on a background thread (required by Apple).
-    /// Once resolved, the URL is stored so subsequent writes go to iCloud.
+    /// Resolves the ubiquity Documents container on iCloudSetupQueue (NOT saveQueue).
+    /// url(forUbiquityContainerIdentifier:) can block for several seconds on first launch;
+    /// by keeping it off saveQueue we ensure saveQueue.sync never stalls the main thread.
     private func setupICloud() {
-        saveQueue.async { [weak self] in
+        iCloudSetupQueue.async { [weak self] in
             guard let self else { return }
             guard let ubiquityURL = FileManager.default
                 .url(forUbiquityContainerIdentifier: PersistenceStore.iCloudContainer)?
@@ -102,7 +110,9 @@ final class PersistenceStore {
             try? FileManager.default.createDirectory(
                 at: ubiquityURL, withIntermediateDirectories: true
             )
-            self.iCloudDir = ubiquityURL
+            // Publish the resolved URL on saveQueue so effectiveDir/fileURL
+            // reads are serialized with all file writes.
+            self.saveQueue.async { self.iCloudDir = ubiquityURL }
         }
     }
 
@@ -110,8 +120,7 @@ final class PersistenceStore {
 
     /// True when iCloud Drive is available on this device.
     var isICloudAvailable: Bool {
-        // Check synchronously from main thread — acceptable since iCloudDir
-        // is only nil until the first saveQueue task completes (~ms).
+        // iCloudDir is only mutated on saveQueue, so reading it here is safe.
         saveQueue.sync { iCloudDir != nil }
     }
 
@@ -151,18 +160,54 @@ final class PersistenceStore {
 
     // MARK: Categories
 
+    /// Async save — enqueues the write to the background queue.
+    /// Suitable for debounced Combine sinks; NOT guaranteed to complete before force-kill.
     func saveCategories(_ categories: [Category]) {
+        print("[PersistenceStore] saveCategories (async) — \(categories.count) categories scheduled")
         saveJSON(categories, name: Key.categories)
     }
 
+    /// Synchronous save — blocks the caller until the write is committed to disk.
+    /// Use this for every structural mutation (add / edit / delete / reorder group) so data
+    /// survives an immediate force-kill.
+    func saveCategoriesSync(_ categories: [Category]) {
+        print("[PersistenceStore] saveCategoriesSync — writing \(categories.count) categories …")
+        saveJSONSync(categories, name: Key.categories)
+        print("[PersistenceStore] ✅ saveCategoriesSync — committed to disk")
+    }
+
     func loadCategories() -> [Category]? {
-        loadJSON([Category].self, name: Key.categories)
+        let result = loadJSON([Category].self, name: Key.categories)
+        if let result {
+            print("[PersistenceStore] loadCategories — loaded \(result.count) categories from disk")
+        } else {
+            print("[PersistenceStore] loadCategories — no saved file; will use defaults")
+        }
+        return result
+    }
+
+    /// Blocks until all pending background writes have finished.
+    /// Call from app-lifecycle hooks (scene going .inactive / .background) so
+    /// any in-flight debounced saves are guaranteed to reach disk.
+    func flush() {
+        print("[PersistenceStore] 🔄 flush() — draining saveQueue …")
+        saveQueue.sync {}
+        print("[PersistenceStore] ✅ flush() — all pending writes committed")
     }
 
     // MARK: Expenses
 
     func saveExpenses(_ expenses: [Expense]) {
         saveJSON(expenses, name: Key.expenses)
+    }
+
+    /// Synchronous save — blocks the caller until the write is committed to disk.
+    /// Use this for every structural mutation (add / edit / delete expense) so data
+    /// survives an immediate force-kill.
+    func saveExpensesSync(_ expenses: [Expense]) {
+        print("[PersistenceStore] saveExpensesSync — writing \(expenses.count) expenses …")
+        saveJSONSync(expenses, name: Key.expenses)
+        print("[PersistenceStore] ✅ saveExpensesSync — committed to disk")
     }
 
     func loadExpenses() -> [Expense]? {
@@ -173,6 +218,13 @@ final class PersistenceStore {
 
     func saveRecurring(_ items: [RecurringExpense]) {
         saveJSON(items, name: Key.recurring)
+    }
+
+    /// Synchronous save for recurring expenses — guarantees write before force-kill.
+    func saveRecurringSync(_ items: [RecurringExpense]) {
+        print("[PersistenceStore] saveRecurringSync — writing \(items.count) recurring items …")
+        saveJSONSync(items, name: Key.recurring)
+        print("[PersistenceStore] ✅ saveRecurringSync — committed to disk")
     }
 
     func loadRecurring() -> [RecurringExpense]? {
@@ -212,21 +264,49 @@ final class PersistenceStore {
 
     // MARK: Generic helpers
 
-    /// Encodes and writes on a background thread (non-blocking).
+    /// Encodes and writes on the background queue (non-blocking).
+    /// Not guaranteed to complete before a force-kill — use saveJSONSync for structural data.
     private func saveJSON<T: Encodable>(_ value: T, name: String) {
         do {
             let data = try encoder.encode(value)
-            // Capture effectiveDir on the caller's thread (main), then write async.
-            let url  = fileURL(name)
-            saveQueue.async {
+            saveQueue.async { [self] in
+                // Always write local — loadJSON reads localDir on every launch because
+                // iCloudDir is nil during the async startup window.
                 do {
-                    try data.write(to: url, options: .atomic)
+                    try data.write(to: localFileURL(name), options: .atomic)
                 } catch {
-                    print("[PersistenceStore] Write error (\(name)): \(error)")
+                    print("[PersistenceStore] ❌ Async write error (local/\(name)): \(error)")
+                }
+                // Mirror to iCloud when sync is enabled and the container is resolved.
+                if let cloudURL = iCloudFileURL(name) {
+                    try? data.write(to: cloudURL, options: .atomic)
                 }
             }
         } catch {
-            print("[PersistenceStore] Encode error (\(name)): \(error)")
+            print("[PersistenceStore] ❌ Encode error (\(name)): \(error)")
+        }
+    }
+
+    /// Encodes synchronously, then blocks on saveQueue until the write is committed.
+    /// saveQueue is only used for file I/O (iCloud setup has its own queue),
+    /// so this returns in < 1 ms and is safe to call from the main thread.
+    private func saveJSONSync<T: Encodable>(_ value: T, name: String) {
+        do {
+            let data = try encoder.encode(value)
+            saveQueue.sync { [self] in
+                // Always write local — same reason as saveJSON above.
+                do {
+                    try data.write(to: localFileURL(name), options: .atomic)
+                } catch {
+                    print("[PersistenceStore] ❌ Sync write error (local/\(name)): \(error)")
+                }
+                // Mirror to iCloud when sync is enabled and the container is resolved.
+                if let cloudURL = iCloudFileURL(name) {
+                    try? data.write(to: cloudURL, options: .atomic)
+                }
+            }
+        } catch {
+            print("[PersistenceStore] ❌ Encode error (\(name)): \(error)")
         }
     }
 

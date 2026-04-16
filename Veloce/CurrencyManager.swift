@@ -106,9 +106,21 @@ final class CurrencyManager: ObservableObject {
         //    symbol and decimal rules when the ViewModel publishes its changes.
         UserDefaults.standard.set(newCurrency.rawValue, forKey: "veloce_currency")
 
-        // 5. Push updates to the ViewModel.
-        //    The Combine sinks in ExpenseViewModel debounce and persist
-        //    everything to disk automatically — no extra save call needed.
+        // 5. Sync-save all converted amounts immediately.
+        //    The currency key (step 4) and the converted amounts MUST be consistent
+        //    on disk. Without this, a force-kill between the key write and the
+        //    debounced Combine saves would leave new-currency key + old-currency
+        //    amounts on disk — causing wildly wrong values on next launch
+        //    (e.g. 100,000 VND stored but read as $100,000 USD).
+        let store = PersistenceStore.shared
+        store.saveCategoriesSync(convertedCategories)
+        store.saveExpensesSync(convertedExpenses)
+        store.saveMonthlyIncome(convertedIncome)   // UserDefaults — synchronous by nature
+        store.saveSavingGoal(convertedSavingGoal)  // UserDefaults — synchronous by nature
+
+        // 6. Push updates to the ViewModel (triggers UI refresh).
+        //    The Combine sinks will fire another write, but the data is already
+        //    safely on disk — those writes are harmless belt-and-suspenders.
         withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
             vm.expenses      = convertedExpenses
             vm.categories    = convertedCategories

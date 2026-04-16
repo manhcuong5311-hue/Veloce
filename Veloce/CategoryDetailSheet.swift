@@ -70,7 +70,10 @@ struct CategoryDetailSheet: View {
                     }
                 }
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button("Done") { dismiss() }
+                    Button(String(localized: "common.done")) {
+                        dismiss()
+                    }
+
                         .font(.system(size: 15, weight: .semibold))
                         .foregroundStyle(VeloceTheme.accent)
                 }
@@ -85,8 +88,12 @@ struct CategoryDetailSheet: View {
         .sheet(isPresented: $showPaywall) {
             PaywallView().environmentObject(subManager)
         }
-        .alert("Can't Update Budget", isPresented: $showBudgetConstraintAlert) {
-            Button("OK", role: .cancel) {}
+        .alert(
+            String(localized: "budget.error.update"),
+            isPresented: $showBudgetConstraintAlert
+        ) {
+            Button(String(localized: "common.ok"), role: .cancel) {}
+        
         } message: {
             Text(String(format: String(localized: "budget_constraint_alert_fmt"),
                         vm.savingGoal.toCompactCurrency()))
@@ -128,7 +135,8 @@ struct CategoryDetailSheet: View {
         VStack(spacing: 16) {
             HStack(alignment: .top) {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Spent")
+                    Text(String(localized: "budget.spent"))
+
                         .font(.system(size: 12)).foregroundStyle(VeloceTheme.textSecondary)
                     Text(live.spent.toCurrencyString())
                         .font(.system(size: 24, weight: .bold, design: .rounded))
@@ -141,7 +149,7 @@ struct CategoryDetailSheet: View {
 
                 VStack(alignment: .trailing, spacing: 4) {
                     HStack(spacing: 5) {
-                        Text("Budget")
+                        Text(String(localized: "budget.amount"))
                             .font(.system(size: 12)).foregroundStyle(VeloceTheme.textSecondary)
                         Button(action: startBudgetEdit) {
                             Image(systemName: "pencil.circle.fill")
@@ -222,13 +230,13 @@ struct CategoryDetailSheet: View {
 
             // Stats row
             HStack {
-                miniStat("Remaining", live.remainingBudget.toCompactCurrency(),
+                miniStat("budget.stat.remaining", live.remainingBudget.toCompactCurrency(),
                          live.isOverBudget ? VeloceTheme.over : VeloceTheme.ok)
                 Spacer()
-                miniStat("Used", "\(Int(min(live.spentRatio, 9.99) * 100))%",
+                miniStat("budget.stat.used", "\(Int(min(live.spentRatio, 9.99) * 100))%",
                          vm.statusColor(for: live))
                 Spacer()
-                miniStat("Txns", "\(vm.expenses(for: live.id).count)",
+                miniStat("budget.stat.transactions", "\(vm.expenses(for: live.id).count)",
                          VeloceTheme.textSecondary)
             }
         }
@@ -283,15 +291,17 @@ struct CategoryDetailSheet: View {
                     .font(.system(size: 15))
                     .foregroundStyle(VeloceTheme.accent)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("AI Insight available")
+                    Text("ai.insight.available")
                         .font(.system(size: 13, weight: .semibold))
                         .foregroundStyle(VeloceTheme.textPrimary)
-                    Text("Upgrade to Pro to unlock")
+                    Text("ai.upgrade.pro")
+
                         .font(.system(size: 12))
                         .foregroundStyle(VeloceTheme.textSecondary)
                 }
                 Spacer()
-                Text("Unlock")
+                Text("common.unlock")
+
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(.white)
                     .padding(.horizontal, 12)
@@ -312,13 +322,13 @@ struct CategoryDetailSheet: View {
 
     private var transactionsSection: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("Transactions")
+            Text("transaction.title")
                 .font(.system(size: 13, weight: .semibold))
                 .foregroundStyle(VeloceTheme.textSecondary)
 
             let items = vm.expenses(for: live.id)
             if items.isEmpty {
-                Text("No expenses recorded yet")
+                Text("expense.empty")
                     .font(.system(size: 14))
                     .foregroundStyle(VeloceTheme.textTertiary)
                     .frame(maxWidth: .infinity, alignment: .center)

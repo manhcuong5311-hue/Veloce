@@ -646,9 +646,10 @@ private struct NewGroupSheet: View {
             budget:   budget,
             colorHex: selectedColorHex
         )
-        withAnimation(.spring(response: 0.3)) {
-            vm.categories.append(newCat)
-        }
+        print("[NewGroupSheet] save() — creating '\(newCat.name)'")
+        // addCategory() appends with animation AND synchronously commits to disk
+        // before this function returns — safe against an immediate force-kill.
+        vm.addCategory(newCat)
         UINotificationFeedbackGenerator().notificationOccurred(.success)
         dismiss()
     }

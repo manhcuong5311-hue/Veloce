@@ -218,11 +218,11 @@ struct InsightsView: View {
                 HStack(spacing: 10) {
                     ZStack {
                         Circle()
-                            .fill(Color(hex: "7B6CF0").opacity(0.15))
+                            .fill(VeloceTheme.accentBg)
                             .frame(width: 36, height: 36)
                         Image(systemName: "lock.fill")
                             .font(.system(size: 14, weight: .semibold))
-                            .foregroundStyle(Color(hex: "7B6CF0"))
+                            .foregroundStyle(VeloceTheme.accent)
                     }
                     VStack(alignment: .leading, spacing: 2) {
                         Text("\(proOnlyCards.count) more Pro insight\(proOnlyCards.count == 1 ? "" : "s") available")
@@ -239,14 +239,14 @@ struct InsightsView: View {
                         .foregroundStyle(.white)
                         .padding(.horizontal, 12)
                         .padding(.vertical, 7)
-                        .background(Color(hex: "7B6CF0"), in: Capsule())
+                        .background(VeloceTheme.accent, in: Capsule())
                 }
                 .padding(16)
                 .background(VeloceTheme.surface)
                 .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
                 .overlay(
                     RoundedRectangle(cornerRadius: 16, style: .continuous)
-                        .strokeBorder(Color(hex: "7B6CF0").opacity(0.2), lineWidth: 1)
+                        .strokeBorder(VeloceTheme.accent.opacity(0.2), lineWidth: 1)
                 )
                 .shadow(color: .black.opacity(0.05), radius: 10, y: 2)
             }

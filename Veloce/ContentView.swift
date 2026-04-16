@@ -358,7 +358,7 @@ private struct ColumnsCard: View {
                 HStack(spacing: 5) {
                     Image(systemName: "hand.draw")
                         .font(.system(size: 11))
-                    Text("Drag bars to adjust your budget")
+                    Text(String(localized: "budget.adjust.drag"))
                         .font(.system(size: 12))
                 }
                 .foregroundStyle(VeloceTheme.textSecondary)
@@ -436,15 +436,15 @@ private struct ColumnsCard: View {
         .onAppear {
             panelState = SpendingPanelState(rawValue: savedState) ?? .medium
         }
-        .alert("Can't Update Budget", isPresented: $showConstraintModal) {
-            Button("Adjust Saving Target") {
-                // Dismiss edit mode — user should go to Settings
+        .alert(String(localized: "budget.error.title"), isPresented: $showConstraintModal) {
+            Button(String(localized: "budget.error.adjustSaving")) {
                 withAnimation(.spring(response: 0.38, dampingFraction: 0.80)) {
                     isEditingBudget  = false
                     activeCategoryId = nil
                 }
             }
-            Button("Cancel", role: .cancel) {}
+            
+            Button(String(localized: "common.cancel"), role: .cancel) {}
         } message: {
             Text(String(format: String(localized: "budget_constraint_alert_fmt"),
                         vm.savingGoal.toCompactCurrency()))
@@ -460,7 +460,7 @@ private struct ColumnsCard: View {
                 HStack(spacing: 4) {
                     Image(systemName: "arrow.up.and.down")
                         .font(.system(size: 9, weight: .medium))
-                    Text("Drag to expand")
+                    Text(String(localized: "ui.drag.expand"))
                         .font(.system(size: 11, weight: .medium))
                 }
                 .foregroundStyle(VeloceTheme.textTertiary)
@@ -533,7 +533,7 @@ private struct ColumnsCard: View {
 
     private var normalHeader: some View {
         HStack(spacing: 8) {
-            Text("Spending")
+            Text(String(localized: "finance.spending"))
                 .font(.system(size: 15, weight: .semibold))
                 .foregroundStyle(VeloceTheme.textPrimary)
             Spacer()
@@ -547,7 +547,7 @@ private struct ColumnsCard: View {
             // ── Title row ─────────────────────────────────────────
             HStack(alignment: .center, spacing: 8) {
                 VStack(alignment: .leading, spacing: 3) {
-                    Text("Edit Budget")
+                    Text(String(localized: "budget.edit"))
                         .font(.system(size: 15, weight: .semibold))
                         .foregroundStyle(VeloceTheme.textPrimary)
 
@@ -576,7 +576,7 @@ private struct ColumnsCard: View {
                         activeCategoryId = nil
                     }
                 } label: {
-                    Text("Done")
+                    Text(String(localized: "common.done"))
                         .font(.system(size: 13, weight: .semibold))
                         .foregroundStyle(VeloceTheme.accent)
                         .padding(.horizontal, 14)
@@ -594,7 +594,7 @@ private struct ColumnsCard: View {
                 HStack(spacing: 6) {
                     Image(systemName: "info.circle")
                         .font(.system(size: 11))
-                    Text("Set monthly salary in Settings to see savings impact")
+                    Text(String(localized: "settings.salary.hint"))
                         .font(.system(size: 11))
                 }
                 .foregroundStyle(VeloceTheme.textTertiary)
@@ -628,32 +628,46 @@ private struct ColumnsCard: View {
         return VStack(spacing: 10) {
             // ── Numbers row ───────────────────────────────────────
             HStack(alignment: .top, spacing: 0) {
-                savingsColumn(label: "Income",    value: income.toCompactCurrency(),   color: VeloceTheme.textSecondary)
+                savingsColumn(
+                    label: String(localized: "finance.income"),
+                    value: income.toCompactCurrency(),
+                    color: VeloceTheme.textSecondary
+                )
+                
                 arrowSpacer()
+                
                 if hasSaving {
                     savingsColumn(
-                        label: "Reserved",
+                        label: String(localized: "finance.reserved"),
                         value: savingGoal.toCompactCurrency(),
                         color: VeloceTheme.ok,
                         prefix: "-"
                     )
+                    
                     arrowSpacer()
+                    
                     savingsColumn(
-                        label: "Ceiling",
+                        label: String(localized: "finance.ceiling"),
                         value: ceiling.toCompactCurrency(),
                         color: isWithin ? VeloceTheme.textSecondary : VeloceTheme.over
                     )
+                    
                     arrowSpacer()
                 }
+                
                 savingsColumn(
-                    label: "Budget",
+                    label: String(localized: "finance.budget"),
                     value: budget.toCompactCurrency(),
                     color: VeloceTheme.accent,
                     animate: true
                 )
+                
                 arrowSpacer()
+                
                 savingsColumn(
-                    label: unallocated >= 0 ? "Free" : "Over",
+                    label: unallocated >= 0
+                        ? String(localized: "finance.free")
+                        : String(localized: "finance.over"),
                     value: abs(unallocated).toCompactCurrency(),
                     color: unallocated >= 0 ? VeloceTheme.ok : VeloceTheme.over,
                     prefix: unallocated >= 0 ? "+" : "-",
@@ -722,16 +736,17 @@ private struct ColumnsCard: View {
     }
 
     private func savingsColumn(
-        label:   LocalizedStringKey,
-        value:   String,
-        color:   Color,
-        prefix:  String = "",
-        animate: Bool   = false
+        label: String,
+        value: String,
+        color: Color,
+        prefix: String = "",
+        animate: Bool = false
     ) -> some View {
         VStack(alignment: .center, spacing: 1) {
             Text(label)
                 .font(.system(size: 9, weight: .medium))
                 .foregroundStyle(VeloceTheme.textTertiary)
+
             HStack(spacing: 1) {
                 if !prefix.isEmpty {
                     Text(prefix)
@@ -744,7 +759,7 @@ private struct ColumnsCard: View {
             .foregroundStyle(color)
         }
     }
-
+    
     private func arrowSpacer() -> some View {
         Image(systemName: "chevron.right")
             .font(.system(size: 7, weight: .semibold))
@@ -771,7 +786,7 @@ private struct ColumnsCard: View {
             HStack(spacing: 4) {
                 Image(systemName: "slider.vertical.3")
                     .font(.system(size: 11))
-                Text("Edit Budget")
+                Text(String(localized: "budget.edit"))
                     .font(.system(size: 11, weight: .medium))
             }
             .foregroundStyle(VeloceTheme.accent)
@@ -786,7 +801,7 @@ private struct ColumnsCard: View {
             HStack(spacing: 4) {
                 Image(systemName: "slider.horizontal.3")
                     .font(.system(size: 11))
-                Text("Groups")
+                Text(String(localized: "groups.title"))
                     .font(.system(size: 11, weight: .medium))
             }
             .foregroundStyle(VeloceTheme.textSecondary)
@@ -902,17 +917,24 @@ private struct ExpenseTimeline: View {
                     .font(.system(size: 15))
                     .foregroundStyle(VeloceTheme.textTertiary)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Showing last 30 days")
+                    Text(String(localized: "history.last30days"))
                         .font(.system(size: 13, weight: .semibold))
                         .foregroundStyle(VeloceTheme.textSecondary)
-                    Text("\(hiddenExpenseCount) older expense\(hiddenExpenseCount == 1 ? "" : "s") hidden · Tap to unlock full history")
+                    Text(
+                        String(
+                            format: String(localized: "history.hidden_count_fmt"),
+                            hiddenExpenseCount,
+                            hiddenExpenseCount == 1 ? "" : "s"
+                        )
+                    )
                         .font(.system(size: 11))
                         .foregroundStyle(VeloceTheme.textTertiary)
                 }
                 Spacer()
                 HStack(spacing: 3) {
                     Image(systemName: "lock.fill").font(.system(size: 9, weight: .bold))
-                    Text("Pro").font(.system(size: 11, weight: .semibold))
+                    Text(String(localized: "subscription.pro"))
+                        .font(.system(size: 11, weight: .semibold))
                 }
                 .foregroundStyle(VeloceTheme.accent)
                 .padding(.horizontal, 8)
@@ -936,7 +958,7 @@ private struct ExpenseTimeline: View {
             Image(systemName: "magnifyingglass")
                 .font(.system(size: 14, weight: .medium))
                 .foregroundStyle(searchText.isEmpty ? VeloceTheme.textTertiary : VeloceTheme.accent)
-            TextField("Search expenses…", text: $searchText)
+            TextField(String(localized: "search.expenses.placeholder"), text: $searchText)
                 .font(.system(size: 14))
                 .foregroundStyle(VeloceTheme.textPrimary)
                 .tint(VeloceTheme.accent)
@@ -966,7 +988,7 @@ private struct ExpenseTimeline: View {
                 Button {
                     withAnimation(.spring(response: 0.25)) { filterCategoryId = nil }
                 } label: {
-                    Text("All")
+                    Text(String(localized: "common.all"))
                         .font(.system(size: 12, weight: .medium))
                         .foregroundStyle(filterCategoryId == nil ? .white : VeloceTheme.textSecondary)
                         .padding(.horizontal, 12)
@@ -1024,12 +1046,19 @@ private struct ExpenseTimeline: View {
             Image(systemName: isFiltering ? "magnifyingglass" : "tray")
                 .font(.system(size: 36, weight: .light))
                 .foregroundStyle(VeloceTheme.textTertiary)
-            Text(isFiltering ? "No results found" : "No expenses yet")
+            Text(
+                isFiltering
+                ? String(localized: "empty.search.no_results")
+                : String(localized: "empty.expense.none")
+            )
+
                 .font(.system(size: 15, weight: .medium))
                 .foregroundStyle(VeloceTheme.textSecondary)
-            Text(isFiltering
-                 ? "Try a different search or filter"
-                 : "Try: \"coffee 40k\" or \"lunch 80k\"")
+            Text(
+                isFiltering
+                ? String(localized: "empty.search.try_again")
+                : String(localized: "empty.expense.suggestion")
+            )
                 .font(.system(size: 13))
                 .foregroundStyle(VeloceTheme.textTertiary)
         }
@@ -1088,15 +1117,16 @@ private struct NotificationDeniedBanner: View {
                         .font(.system(size: 14))
                         .foregroundStyle(VeloceTheme.over)
                     VStack(alignment: .leading, spacing: 1) {
-                        Text("Notifications are off")
+                        Text(String(localized: "notifications.disabled"))
+
                             .font(.system(size: 13, weight: .semibold))
                             .foregroundStyle(VeloceTheme.textPrimary)
-                        Text("Tap to enable in Settings")
+                        Text(String(localized: "notifications.enable_hint"))
                             .font(.system(size: 11))
                             .foregroundStyle(VeloceTheme.textSecondary)
                     }
                     Spacer()
-                    Text("Enable")
+                    Text(String(localized: "common.enable"))
                         .font(.system(size: 12, weight: .semibold))
                         .foregroundStyle(VeloceTheme.accent)
                         .padding(.horizontal, 10)

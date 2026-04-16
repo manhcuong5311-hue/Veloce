@@ -39,11 +39,11 @@ struct AddExpenseSheet: View {
                     .padding(.bottom, 24)
                 }
             }
-            .navigationTitle("Add Expense")
+            .navigationTitle(String(localized: "add_expense_title"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    Button("Cancel") { dismiss() }
+                    Button(String(localized: "cancel_button")) { dismiss() }
                         .foregroundStyle(VeloceTheme.textSecondary)
                 }
             }
@@ -64,7 +64,7 @@ struct AddExpenseSheet: View {
 
     private var amountHero: some View {
         VStack(spacing: 6) {
-            Text("Amount")
+            Text(String(localized: "amount_label"))
                 .font(.system(size: 12, weight: .medium))
                 .foregroundStyle(VeloceTheme.textSecondary)
                 .tracking(0.3)
@@ -116,8 +116,8 @@ struct AddExpenseSheet: View {
 
     private var detailsCard: some View {
         VStack(spacing: 0) {
-            formRow("Title") {
-                TextField("What did you spend on?", text: $title)
+            formRow("title_label") {
+                TextField(String(localized: "title_placeholder"), text: $title)
                     .font(.system(size: 15))
                     .foregroundStyle(VeloceTheme.textPrimary)
                     .tint(VeloceTheme.accent)
@@ -127,8 +127,8 @@ struct AddExpenseSheet: View {
 
             thinDivider
 
-            formRow("Note") {
-                TextField("Optional note…", text: $note)
+            formRow("note_label") {
+                TextField(String(localized: "note_placeholder"), text: $note)
                     .font(.system(size: 15))
                     .foregroundStyle(VeloceTheme.textPrimary)
                     .tint(VeloceTheme.accent)
@@ -138,11 +138,13 @@ struct AddExpenseSheet: View {
 
             thinDivider
 
-            formRow("Category") { categoryScroll }
+            formRow( "category_label") {
+                categoryScroll
+            }
 
             thinDivider
 
-            formRow("Date") {
+            formRow("date_label") {
                 DatePicker("", selection: $date, displayedComponents: [.date, .hourAndMinute])
                     .labelsHidden()
                     .tint(VeloceTheme.accent)
@@ -197,7 +199,7 @@ struct AddExpenseSheet: View {
 
     private var saveButton: some View {
         Button(action: save) {
-            Text("Add Expense")
+            Text(String(localized: "expense.add.title"))
                 .font(.system(size: 16, weight: .semibold))
                 .foregroundStyle(.white)
                 .frame(maxWidth: .infinity)
@@ -268,11 +270,11 @@ struct EditExpenseSheet: View {
                     .padding(.bottom, 24)
                 }
             }
-            .navigationTitle("Edit Expense")
+            .navigationTitle(String(localized: "expense.edit.title"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    Button("Cancel") { dismiss() }
+                    Button(String(localized: "common.cancel")) { dismiss() }
                         .foregroundStyle(VeloceTheme.textSecondary)
                 }
             }
@@ -292,7 +294,7 @@ struct EditExpenseSheet: View {
 
     private var amountHero: some View {
         VStack(spacing: 6) {
-            Text("Amount")
+            Text(String(localized: "expense.amount"))
                 .font(.system(size: 12, weight: .medium))
                 .foregroundStyle(VeloceTheme.textSecondary)
                 .tracking(0.3)
@@ -344,8 +346,9 @@ struct EditExpenseSheet: View {
 
     private var detailsCard: some View {
         VStack(spacing: 0) {
-            formRow("Title") {
-                TextField("What did you spend on?", text: $title)
+            formRow("expense.field.title") {
+                TextField(String(localized: "expense.placeholder.title"), text: $title)
+               
                     .font(.system(size: 15))
                     .foregroundStyle(VeloceTheme.textPrimary)
                     .tint(VeloceTheme.accent)
@@ -355,8 +358,8 @@ struct EditExpenseSheet: View {
 
             thinDivider
 
-            formRow("Note") {
-                TextField("Optional note…", text: $note)
+            formRow("expense.field.note") {
+                TextField(String(localized: "expense.placeholder.note"), text: $note)
                     .font(.system(size: 15))
                     .foregroundStyle(VeloceTheme.textPrimary)
                     .tint(VeloceTheme.accent)
@@ -366,11 +369,11 @@ struct EditExpenseSheet: View {
 
             thinDivider
 
-            formRow("Category") { categoryScroll }
+            formRow("expense.field.category") { categoryScroll }
 
             thinDivider
 
-            formRow("Date") {
+            formRow("expense.field.date") {
                 DatePicker("", selection: $date, displayedComponents: [.date, .hourAndMinute])
                     .labelsHidden()
                     .tint(VeloceTheme.accent)
@@ -425,7 +428,7 @@ struct EditExpenseSheet: View {
 
     private var saveButton: some View {
         Button(action: save) {
-            Text("Save Changes")
+            Text(String(localized: "expense.save_changes"))
                 .font(.system(size: 16, weight: .semibold))
                 .foregroundStyle(.white)
                 .frame(maxWidth: .infinity)

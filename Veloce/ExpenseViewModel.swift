@@ -115,6 +115,11 @@ final class ExpenseViewModel: ObservableObject {
     func addExpense(_ expense: Expense) {
         expenses.append(expense)
         adjustSpent(categoryId: expense.categoryId, delta: +expense.amount)
+        // Sync write: guarantees the expense reaches disk before this function returns,
+        // surviving an immediate force-kill. adjustSpent triggers the $categories sink
+        // which enqueues an async categories write; saveQueue.sync below drains that
+        // write first, so both files are committed atomically from the caller's view.
+        PersistenceStore.shared.saveExpensesSync(expenses)
         highlight(expense.categoryId)
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
 
@@ -142,6 +147,7 @@ final class ExpenseViewModel: ObservableObject {
         withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
             expenses.removeAll { $0.id == expense.id }
         }
+        PersistenceStore.shared.saveExpensesSync(expenses)
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
     }
 
@@ -151,6 +157,7 @@ final class ExpenseViewModel: ObservableObject {
         if let i = expenses.firstIndex(where: { $0.id == updated.id }) {
             expenses[i] = updated
         }
+        PersistenceStore.shared.saveExpensesSync(expenses)
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
     }
 
@@ -205,11 +212,25 @@ final class ExpenseViewModel: ObservableObject {
         categories[i].budget = newBudget
     }
 
+    /// Creates a new category, appends it, and **synchronously** commits to disk.
+    /// The sync write guarantees the group survives an immediate force-kill.
+    func addCategory(_ category: Category) {
+        print("[ExpenseViewModel] addCategory: '\(category.name)' — appending")
+        withAnimation(.spring(response: 0.3)) {
+            categories.append(category)
+        }
+        PersistenceStore.shared.saveCategoriesSync(categories)
+        print("[ExpenseViewModel] addCategory: '\(category.name)' ✅ persisted (\(categories.count) total)")
+    }
+
     func updateCategory(_ updated: Category) {
         guard let i = categories.firstIndex(where: { $0.id == updated.id }) else { return }
+        print("[ExpenseViewModel] updateCategory: '\(updated.name)'")
         withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
             categories[i] = updated
         }
+        PersistenceStore.shared.saveCategoriesSync(categories)
+        print("[ExpenseViewModel] updateCategory: '\(updated.name)' ✅ persisted")
     }
 
     func deleteExpenses(_ items: [Expense]) {
@@ -219,20 +240,27 @@ final class ExpenseViewModel: ObservableObject {
     func deleteCategory(id: UUID) {
         // Expenses that referenced this category keep their categoryId but will no longer
         // appear in any category's budget tracking. They remain visible in the timeline.
+        let name = categories.first(where: { $0.id == id })?.name ?? id.uuidString
+        print("[ExpenseViewModel] deleteCategory: '\(name)'")
         withAnimation(.spring(response: 0.3)) {
             categories.removeAll { $0.id == id }
         }
+        PersistenceStore.shared.saveCategoriesSync(categories)
+        print("[ExpenseViewModel] deleteCategory: '\(name)' ✅ persisted (\(categories.count) remaining)")
     }
 
     func toggleCategoryVisibility(id: UUID) {
         guard let i = categories.firstIndex(where: { $0.id == id }) else { return }
         withAnimation(.spring(response: 0.3)) { categories[i].isHidden.toggle() }
+        PersistenceStore.shared.saveCategoriesSync(categories)
     }
 
     func reorderCategories(from source: IndexSet, to destination: Int) {
         withAnimation(.spring(response: 0.3)) {
             categories.move(fromOffsets: source, toOffset: destination)
         }
+        PersistenceStore.shared.saveCategoriesSync(categories)
+        print("[ExpenseViewModel] reorderCategories ✅ persisted")
     }
 
     func moveCategory(id: UUID, by direction: Int) {
@@ -242,6 +270,7 @@ final class ExpenseViewModel: ObservableObject {
         withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
             categories.swapAt(i, j)
         }
+        PersistenceStore.shared.saveCategoriesSync(categories)
     }
 
     // MARK: Export / Import
@@ -282,8 +311,8 @@ final class ExpenseViewModel: ObservableObject {
             self.savingGoal    = payload.savingGoal
         }
         let store = PersistenceStore.shared
-        store.saveCategories(rebuilt)
-        store.saveExpenses(payload.expenses)
+        store.saveCategoriesSync(rebuilt)
+        store.saveExpensesSync(payload.expenses)
         store.saveMonthlyIncome(payload.monthlyIncome)
         store.saveSavingGoal(payload.savingGoal)
     }
@@ -447,18 +476,18 @@ final class ExpenseViewModel: ObservableObject {
 
     func addRecurring(_ item: RecurringExpense) {
         recurringExpenses.append(item)
-        PersistenceStore.shared.saveRecurring(recurringExpenses)
+        PersistenceStore.shared.saveRecurringSync(recurringExpenses)
     }
 
     func deleteRecurring(_ item: RecurringExpense) {
         recurringExpenses.removeAll { $0.id == item.id }
-        PersistenceStore.shared.saveRecurring(recurringExpenses)
+        PersistenceStore.shared.saveRecurringSync(recurringExpenses)
     }
 
     func updateRecurring(_ updated: RecurringExpense) {
         guard let i = recurringExpenses.firstIndex(where: { $0.id == updated.id }) else { return }
         recurringExpenses[i] = updated
-        PersistenceStore.shared.saveRecurring(recurringExpenses)
+        PersistenceStore.shared.saveRecurringSync(recurringExpenses)
     }
 
     /// Called on app foreground — auto-adds any overdue recurring expenses
@@ -477,7 +506,7 @@ final class ExpenseViewModel: ObservableObject {
             recurringExpenses[i].advance()
             changed = true
         }
-        if changed { PersistenceStore.shared.saveRecurring(recurringExpenses) }
+        if changed { PersistenceStore.shared.saveRecurringSync(recurringExpenses) }
     }
 
     // MARK: Private helpers
@@ -540,10 +569,12 @@ final class ExpenseViewModel: ObservableObject {
             store.saveCategories(reconciledCategories)
         }
 
-        // Auto-save whenever published properties change (debounced 400 ms)
+        // Auto-save whenever published properties change.
+        // Categories: no debounce — structural data must reach disk quickly.
+        // All structural mutations (add/edit/delete/reorder) also call saveCategoriesSync()
+        // directly, so this sink is a belt-and-suspenders fallback for any missed path.
         $categories
             .dropFirst()                         // skip the initial assignment
-            .debounce(for: .milliseconds(400), scheduler: RunLoop.main)
             .sink { store.saveCategories($0) }
             .store(in: &cancellables)
 

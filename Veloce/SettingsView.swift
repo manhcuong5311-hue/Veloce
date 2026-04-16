@@ -1238,12 +1238,10 @@ struct AccentColorPickerSheet: View {
     @State private var selected: String = "7B6CF0"
 
     private let palette: [(hex: String, name: String)] = [
-        ("7B6CF0", "Indigo"),     ("5B8DB8", "Blue"),
-        ("5BA88C", "Teal"),       ("6BBF8E", "Sage"),
-        ("D4A853", "Amber"),      ("E07A5F", "Coral"),
-        ("E86B8B", "Rose"),       ("C97BA8", "Mauve"),
-        ("9B84D0", "Lavender"),   ("4B9FA8", "Cyan"),
-        ("8A95A8", "Slate"),      ("1C1B1A", "Graphite"),
+        ("7B6CF0", "Indigo"),   ("5B8DB8", "Blue"),    ("4B9FA8", "Cyan"),    ("5BA88C", "Teal"),    ("6BBF8E", "Sage"),
+        ("3DAF77", "Forest"),   ("86C93A", "Lime"),    ("D4A853", "Amber"),   ("E8945A", "Orange"),  ("E07A5F", "Coral"),
+        ("E84545", "Red"),      ("E86B8B", "Rose"),    ("C97BA8", "Mauve"),   ("9B84D0", "Lavender"),("B44FE0", "Purple"),
+        ("7B3CC4", "Violet"),   ("5A7A9A", "Navy"),    ("8A95A8", "Slate"),   ("6C7B63", "Olive"),   ("1C1B1A", "Graphite"),
     ]
 
     var body: some View {
@@ -1290,8 +1288,8 @@ struct AccentColorPickerSheet: View {
                                 .foregroundStyle(VeloceTheme.textSecondary)
 
                             LazyVGrid(
-                                columns: Array(repeating: GridItem(.flexible(), spacing: 12), count: 4),
-                                spacing: 12
+                                columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 5),
+                                spacing: 10
                             ) {
                                 ForEach(palette, id: \.hex) { item in
                                     let isSelected = selected.uppercased() == item.hex.uppercased()
@@ -1303,22 +1301,23 @@ struct AccentColorPickerSheet: View {
                                             ZStack {
                                                 Circle()
                                                     .fill(Color(hex: item.hex))
-                                                    .frame(width: 52, height: 52)
+                                                    .frame(width: 44, height: 44)
                                                     .overlay(
                                                         Circle()
                                                             .strokeBorder(.white, lineWidth: isSelected ? 3 : 0)
                                                     )
-                                                    .shadow(color: Color(hex: item.hex).opacity(0.4),
+                                                    .shadow(color: Color(hex: item.hex).opacity(0.45),
                                                             radius: isSelected ? 8 : 0, y: 3)
                                                 if isSelected {
                                                     Image(systemName: "checkmark")
-                                                        .font(.system(size: 13, weight: .bold))
+                                                        .font(.system(size: 12, weight: .bold))
                                                         .foregroundStyle(.white)
                                                 }
                                             }
                                             Text(item.name)
-                                                .font(.system(size: 10, weight: isSelected ? .semibold : .regular))
+                                                .font(.system(size: 9, weight: isSelected ? .semibold : .regular))
                                                 .foregroundStyle(isSelected ? Color(hex: item.hex) : VeloceTheme.textTertiary)
+                                                .lineLimit(1)
                                         }
                                     }
                                     .buttonStyle(.plain)
