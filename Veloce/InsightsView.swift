@@ -7,19 +7,36 @@ struct InsightsView: View {
     @EnvironmentObject var subManager: SubscriptionManager
     @Environment(\.dismiss) private var dismiss
 
-    @State private var showAllCards    = false
-    @State private var showAI          = false
-    @State private var aiPrompt:  String? = nil
-    @State private var yearlyExpanded       = false
+    @State private var showAllCards             = false
+    @State private var showAI                   = false
+    @State private var aiPrompt: String?        = nil
+    @State private var yearlyExpanded           = false
     @State private var selectedChartMonth: Int? = nil
+    @State private var showPaywall              = false
+    @State private var paywallTriggerFeature: String? = nil
 
-    private var cards: [InsightCard] {
+    private var allCards: [InsightCard] {
         InsightEngine.generate(
             expenses:      vm.expenses,
             categories:    vm.categories,
             monthlyIncome: vm.monthlyIncome,
             savingGoal:    vm.savingGoal
         )
+    }
+
+    // Free users only see risk-priority cards (anomaly + forecast).
+    private var freeCards: [InsightCard] {
+        allCards.filter { $0.priority == .risk }
+    }
+
+    // Opportunity + informational cards are Pro-only.
+    private var proOnlyCards: [InsightCard] {
+        allCards.filter { $0.priority != .risk }
+    }
+
+    // The cards actually rendered for the card list section.
+    private var cards: [InsightCard] {
+        subManager.isProUser ? allCards : freeCards
     }
 
     private var visibleCards: [InsightCard] {
@@ -55,8 +72,12 @@ struct InsightsView: View {
         }
         .preferredColorScheme(.light)
         .sheet(isPresented: $showAI) {
-            AIAssistantView(autoSendPrompt: aiPrompt)
+            AIAssistantView(autoSendPrompt: aiPrompt, isInsightPrompt: true)
                 .environmentObject(vm)
+                .environmentObject(subManager)
+        }
+        .sheet(isPresented: $showPaywall, onDismiss: { paywallTriggerFeature = nil }) {
+            PaywallView(triggerFeature: paywallTriggerFeature)
                 .environmentObject(subManager)
         }
     }
@@ -134,9 +155,10 @@ struct InsightsView: View {
 
     private var insightCardList: some View {
         VStack(spacing: 12) {
-            if cards.isEmpty {
+            if allCards.isEmpty {
                 emptyState
             } else {
+                // Free or Pro: visible cards for this tier
                 ForEach(visibleCards) { card in
                     InsightCardView(card: card) {
                         aiPrompt = card.aiPrompt
@@ -144,7 +166,8 @@ struct InsightsView: View {
                     }
                 }
 
-                if cards.count > 5 && !showAllCards {
+                // Pro "show more" button
+                if subManager.isProUser && cards.count > 5 && !showAllCards {
                     Button(action: { withAnimation(.spring(response: 0.35)) { showAllCards = true } }) {
                         HStack(spacing: 6) {
                             Text("Show \(cards.count - 5) more insights")
@@ -163,8 +186,72 @@ struct InsightsView: View {
                     }
                     .buttonStyle(.plain)
                 }
+
+                // Free users: locked pro-insight teaser
+                if !subManager.isProUser && !proOnlyCards.isEmpty {
+                    lockedInsightsSection
+                }
             }
         }
+    }
+
+    // MARK: - Locked Pro Insights Teaser
+
+    private var lockedInsightsSection: some View {
+        Button(action: {
+            paywallTriggerFeature = "\(proOnlyCards.count) Pro Insight\(proOnlyCards.count == 1 ? "" : "s")"
+            showPaywall = true
+        }) {
+            VStack(spacing: 0) {
+                // Blurred preview of the first locked card
+                if let first = proOnlyCards.first {
+                    InsightCardView(card: first, onAskAI: {})
+                        .blur(radius: 6)
+                        .allowsHitTesting(false)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                .fill(.ultraThinMaterial)
+                        )
+                }
+
+                // Unlock banner
+                HStack(spacing: 10) {
+                    ZStack {
+                        Circle()
+                            .fill(VeloceTheme.accentBg)
+                            .frame(width: 36, height: 36)
+                        Image(systemName: "lock.fill")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(VeloceTheme.accent)
+                    }
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("\(proOnlyCards.count) more Pro insight\(proOnlyCards.count == 1 ? "" : "s") available")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(VeloceTheme.textPrimary)
+                        Text("Anomaly detection, trends, behavioral analysis…")
+                            .font(.system(size: 12))
+                            .foregroundStyle(VeloceTheme.textSecondary)
+                            .lineLimit(1)
+                    }
+                    Spacer()
+                    Text("Unlock")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 7)
+                        .background(VeloceTheme.accent, in: Capsule())
+                }
+                .padding(16)
+                .background(VeloceTheme.surface)
+                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .strokeBorder(VeloceTheme.accent.opacity(0.2), lineWidth: 1)
+                )
+                .shadow(color: .black.opacity(0.05), radius: 10, y: 2)
+            }
+        }
+        .buttonStyle(.plain)
     }
 
     // MARK: - Empty State

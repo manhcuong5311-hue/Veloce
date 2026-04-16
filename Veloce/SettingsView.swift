@@ -25,9 +25,13 @@ struct SettingsView: View {
     @State private var showImportSuccess    = false
     @State private var showEditSalary         = false
     @State private var showEditSaving         = false
-    @State private var showAccentColorPicker  = false
-    @State private var showBudgetResetDay     = false
-    @State private var showReminderTimePicker = false
+    @State private var showAccentColorPicker   = false
+    @State private var showBudgetResetDay      = false
+    @State private var showReminderTimePicker  = false
+    @State private var showRecurring           = false
+    @State private var showPDFShareSheet      = false
+    @State private var pdfReportURL:          URL?
+    @AppStorage("veloce_icloud_sync") private var iCloudSyncEnabled = false
 
     private var selectedCurrency: Binding<AppCurrency> {
         Binding(
@@ -87,6 +91,9 @@ struct SettingsView: View {
         .sheet(isPresented: $showShareSheet) {
             if let url = exportedFileURL { ShareSheet(activityItems: [url]) }
         }
+        .sheet(isPresented: $showPDFShareSheet) {
+            if let url = pdfReportURL { ShareSheet(activityItems: [url]) }
+        }
         .sheet(isPresented: $showImportPicker) {
             DocumentPicker(allowedTypes: [.json]) { url in handleImport(url: url) }
         }
@@ -111,6 +118,11 @@ struct SettingsView: View {
         }
         .sheet(isPresented: $showBudgetResetDay) {
             BudgetResetDaySheet()
+        }
+        .sheet(isPresented: $showRecurring) {
+            RecurringTransactionsView()
+                .environmentObject(vm)
+                .environmentObject(subManager)
         }
         .sheet(isPresented: $showReminderTimePicker) {
             ReminderTimePickerSheet(notifMgr: notifMgr)
@@ -354,6 +366,15 @@ struct SettingsView: View {
                 subtitle: "Choose your monthly cycle start"
             ) {
                 if subManager.isProUser { showBudgetResetDay = true }
+                else { showPaywall = true }
+            }
+            premiumLockedRow(
+                icon: "arrow.clockwise.circle.fill",
+                iconColor: Color(hex: "7EC8A4"),
+                title: "Recurring Transactions",
+                subtitle: "Auto-log rent, subscriptions & bills"
+            ) {
+                if subManager.isProUser { showRecurring = true }
                 else { showPaywall = true }
             }
 
@@ -613,6 +634,48 @@ struct SettingsView: View {
 
     private var dataSection: some View {
         Section {
+            // iCloud Sync toggle
+            HStack {
+                Label {
+                    Text("iCloud Sync")
+                        .foregroundStyle(subManager.isProUser ? VeloceTheme.textPrimary : VeloceTheme.textTertiary)
+                } icon: {
+                    Image(systemName: "icloud")
+                        .foregroundStyle(subManager.isProUser ? VeloceTheme.accent : VeloceTheme.textTertiary)
+                }
+                Spacer()
+                if subManager.isProUser {
+                    Toggle("", isOn: Binding(
+                        get: { iCloudSyncEnabled },
+                        set: { newValue in
+                            iCloudSyncEnabled = newValue
+                            PersistenceStore.shared.setICloudSync(enabled: newValue)
+                        }
+                    ))
+                    .labelsHidden()
+                    .disabled(!PersistenceStore.shared.isICloudAvailable)
+                } else {
+                    lockBadge
+                }
+            }
+            .onTapGesture { if !subManager.isProUser { showPaywall = true } }
+
+            // Month Report (PDF)
+            Button(action: handlePDFExport) {
+                HStack {
+                    Label {
+                        Text("Month Report (PDF)")
+                            .foregroundStyle(subManager.isProUser ? VeloceTheme.textPrimary : VeloceTheme.textTertiary)
+                    } icon: {
+                        Image(systemName: "doc.richtext")
+                            .foregroundStyle(subManager.isProUser ? VeloceTheme.accent : VeloceTheme.textTertiary)
+                    }
+                    Spacer()
+                    if !subManager.isProUser { lockBadge }
+                }
+            }
+
+            // Export / Import JSON
             Button(action: handleExport) {
                 HStack {
                     Label {
@@ -642,9 +705,15 @@ struct SettingsView: View {
         } header: {
             sectionHeader("Data", icon: "externaldrive")
         } footer: {
-            Text(subManager.isProUser ? "settings_data_pro_footer" : "settings_data_free_footer")
-                .font(.system(size: 12))
-                .foregroundStyle(VeloceTheme.textTertiary)
+            Group {
+                if subManager.isProUser && iCloudSyncEnabled && !PersistenceStore.shared.isICloudAvailable {
+                    Text("iCloud is not available. Sign into iCloud in iOS Settings to enable sync.")
+                } else {
+                    Text(subManager.isProUser ? "settings_data_pro_footer" : "settings_data_free_footer")
+                }
+            }
+            .font(.system(size: 12))
+            .foregroundStyle(VeloceTheme.textTertiary)
         }
     }
 
@@ -751,6 +820,13 @@ struct SettingsView: View {
     }
 
     // MARK: - Export / Import
+
+    private func handlePDFExport() {
+        guard subManager.isProUser else { showPaywall = true; return }
+        guard let url = MonthReportGenerator.generate(vm: vm) else { return }
+        pdfReportURL     = url
+        showPDFShareSheet = true
+    }
 
     private func handleExport() {
         guard subManager.isProUser else { showPaywall = true; return }
@@ -1162,12 +1238,10 @@ struct AccentColorPickerSheet: View {
     @State private var selected: String = "7B6CF0"
 
     private let palette: [(hex: String, name: String)] = [
-        ("7B6CF0", "Indigo"),     ("5B8DB8", "Blue"),
-        ("5BA88C", "Teal"),       ("6BBF8E", "Sage"),
-        ("D4A853", "Amber"),      ("E07A5F", "Coral"),
-        ("E86B8B", "Rose"),       ("C97BA8", "Mauve"),
-        ("9B84D0", "Lavender"),   ("4B9FA8", "Cyan"),
-        ("8A95A8", "Slate"),      ("1C1B1A", "Graphite"),
+        ("7B6CF0", "Indigo"),   ("5B8DB8", "Blue"),    ("4B9FA8", "Cyan"),    ("5BA88C", "Teal"),    ("6BBF8E", "Sage"),
+        ("3DAF77", "Forest"),   ("86C93A", "Lime"),    ("D4A853", "Amber"),   ("E8945A", "Orange"),  ("E07A5F", "Coral"),
+        ("E84545", "Red"),      ("E86B8B", "Rose"),    ("C97BA8", "Mauve"),   ("9B84D0", "Lavender"),("B44FE0", "Purple"),
+        ("7B3CC4", "Violet"),   ("5A7A9A", "Navy"),    ("8A95A8", "Slate"),   ("6C7B63", "Olive"),   ("1C1B1A", "Graphite"),
     ]
 
     var body: some View {
@@ -1214,8 +1288,8 @@ struct AccentColorPickerSheet: View {
                                 .foregroundStyle(VeloceTheme.textSecondary)
 
                             LazyVGrid(
-                                columns: Array(repeating: GridItem(.flexible(), spacing: 12), count: 4),
-                                spacing: 12
+                                columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 5),
+                                spacing: 10
                             ) {
                                 ForEach(palette, id: \.hex) { item in
                                     let isSelected = selected.uppercased() == item.hex.uppercased()
@@ -1227,22 +1301,23 @@ struct AccentColorPickerSheet: View {
                                             ZStack {
                                                 Circle()
                                                     .fill(Color(hex: item.hex))
-                                                    .frame(width: 52, height: 52)
+                                                    .frame(width: 44, height: 44)
                                                     .overlay(
                                                         Circle()
                                                             .strokeBorder(.white, lineWidth: isSelected ? 3 : 0)
                                                     )
-                                                    .shadow(color: Color(hex: item.hex).opacity(0.4),
+                                                    .shadow(color: Color(hex: item.hex).opacity(0.45),
                                                             radius: isSelected ? 8 : 0, y: 3)
                                                 if isSelected {
                                                     Image(systemName: "checkmark")
-                                                        .font(.system(size: 13, weight: .bold))
+                                                        .font(.system(size: 12, weight: .bold))
                                                         .foregroundStyle(.white)
                                                 }
                                             }
                                             Text(item.name)
-                                                .font(.system(size: 10, weight: isSelected ? .semibold : .regular))
+                                                .font(.system(size: 9, weight: isSelected ? .semibold : .regular))
                                                 .foregroundStyle(isSelected ? Color(hex: item.hex) : VeloceTheme.textTertiary)
+                                                .lineLimit(1)
                                         }
                                     }
                                     .buttonStyle(.plain)

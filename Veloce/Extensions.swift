@@ -83,6 +83,74 @@ enum AppCurrency: String, CaseIterable, Identifiable {
     static var current: AppCurrency {
         AppCurrency(rawValue: UserDefaults.standard.string(forKey: "veloce_currency") ?? "VND") ?? .vnd
     }
+
+    /// Sensible default budget string for the "New Group" sheet, in this currency's units.
+    var defaultBudgetText: String {
+        switch self {
+        case .vnd: return "1000000"
+        case .usd: return "200"
+        case .eur: return "200"
+        case .jpy: return "20000"
+        case .gbp: return "150"
+        case .krw: return "200000"
+        case .sgd: return "200"
+        case .thb: return "5000"
+        }
+    }
+
+    /// Quick-pick preset budgets shown in the group edit sheet, localised per currency.
+    var budgetPresets: [(label: String, value: Double)] {
+        switch self {
+        case .vnd:
+            return [
+                ("500K",    500_000), ("1 tr",   1_000_000), ("1.5 tr", 1_500_000),
+                ("2 tr",  2_000_000), ("3 tr",   3_000_000), ("5 tr",   5_000_000),
+                ("10 tr", 10_000_000)
+            ]
+        case .usd:
+            return [
+                ("$50",    50), ("$100",   100), ("$200",   200),
+                ("$300",  300), ("$500",   500), ("$1K",  1_000),
+                ("$2K", 2_000)
+            ]
+        case .eur:
+            return [
+                ("€50",    50), ("€100",   100), ("€200",   200),
+                ("€300",  300), ("€500",   500), ("€1K",  1_000),
+                ("€2K", 2_000)
+            ]
+        case .jpy:
+            return [
+                ("¥2K",   2_000), ("¥5K",   5_000), ("¥10K",  10_000),
+                ("¥20K", 20_000), ("¥30K", 30_000), ("¥50K",  50_000),
+                ("¥100K", 100_000)
+            ]
+        case .gbp:
+            return [
+                ("£50",    50), ("£100",   100), ("£200",   200),
+                ("£300",  300), ("£500",   500), ("£1K",  1_000),
+                ("£2K", 2_000)
+            ]
+        case .krw:
+            return [
+                ("₩20K",   20_000), ("₩50K",   50_000), ("₩100K", 100_000),
+                ("₩200K", 200_000), ("₩300K", 300_000), ("₩500K", 500_000),
+                ("₩1M", 1_000_000)
+            ]
+        case .sgd:
+            return [
+                ("S$50",    50), ("S$100",   100), ("S$200",   200),
+                ("S$300",  300), ("S$500",   500), ("S$1K",  1_000),
+                ("S$2K", 2_000)
+            ]
+        case .thb:
+            return [
+                ("฿500",   500), ("฿1K",   1_000), ("฿2K",   2_000),
+                ("฿3K",  3_000), ("฿5K",   5_000), ("฿10K", 10_000),
+                ("฿20K", 20_000)
+            ]
+        }
+    }
 }
 
 // MARK: - Speech Language

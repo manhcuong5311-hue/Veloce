@@ -99,6 +99,72 @@ struct AIAdvice {
     var potentialSaving: Double
 }
 
+// MARK: - Recurring Transactions
+
+struct RecurringExpense: Codable, Identifiable {
+
+    enum Frequency: String, Codable, CaseIterable {
+        case daily, weekly, monthly
+
+        var label: String {
+            switch self {
+            case .daily:   return "Daily"
+            case .weekly:  return "Weekly"
+            case .monthly: return "Monthly"
+            }
+        }
+
+        var sfSymbol: String {
+            switch self {
+            case .daily:   return "sun.max.fill"
+            case .weekly:  return "calendar.badge.clock"
+            case .monthly: return "calendar"
+            }
+        }
+    }
+
+    var id: UUID
+    var title: String
+    var amount: Double
+    var categoryId: UUID
+    var frequency: Frequency
+    var nextDueDate: Date
+    var note: String
+
+    init(
+        id: UUID = UUID(),
+        title: String,
+        amount: Double,
+        categoryId: UUID,
+        frequency: Frequency = .monthly,
+        nextDueDate: Date = Date(),
+        note: String = ""
+    ) {
+        self.id          = id
+        self.title       = title
+        self.amount      = amount
+        self.categoryId  = categoryId
+        self.frequency   = frequency
+        self.nextDueDate = nextDueDate
+        self.note        = note
+    }
+
+    var isDue: Bool { nextDueDate <= Date() }
+
+    /// Advance nextDueDate by one frequency period.
+    mutating func advance() {
+        let cal = Calendar.current
+        switch frequency {
+        case .daily:
+            nextDueDate = cal.date(byAdding: .day,        value: 1, to: nextDueDate) ?? nextDueDate
+        case .weekly:
+            nextDueDate = cal.date(byAdding: .weekOfYear, value: 1, to: nextDueDate) ?? nextDueDate
+        case .monthly:
+            nextDueDate = cal.date(byAdding: .month,      value: 1, to: nextDueDate) ?? nextDueDate
+        }
+    }
+}
+
 // MARK: - Export / Import Envelope
 
 struct VeloceExportData: Codable {

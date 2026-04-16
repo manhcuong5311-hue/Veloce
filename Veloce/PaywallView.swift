@@ -21,6 +21,10 @@ struct PaywallView: View {
     @EnvironmentObject private var subManager: SubscriptionManager
     @Environment(\.dismiss) private var dismiss
 
+    /// When set, shows a contextual "Unlock to access X" line in the hero so the
+    /// user knows exactly which feature triggered the paywall.
+    var triggerFeature: String? = nil
+
     @State private var selectedPlan: PlanType = .lifetime
     @State private var isPurchasing            = false
     @State private var isRestoring             = false
@@ -166,10 +170,26 @@ struct PaywallView: View {
                 Text("Unlock Premium")
                     .font(.system(size: 32, weight: .bold, design: .rounded))
                     .foregroundStyle(.white)
-                Text("Take full control of your finances")
-                    .font(.system(size: 16))
-                    .foregroundStyle(.white.opacity(0.55))
-                    .multilineTextAlignment(.center)
+
+                if let feature = triggerFeature {
+                    HStack(spacing: 6) {
+                        Image(systemName: "lock.open.fill")
+                            .font(.system(size: 12, weight: .semibold))
+                        Text("Unlock \(feature)")
+                            .font(.system(size: 13, weight: .semibold))
+                    }
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 6)
+                    .background(.white.opacity(0.12), in: Capsule())
+                    .overlay(Capsule().strokeBorder(.white.opacity(0.18), lineWidth: 1))
+                    .transition(.scale.combined(with: .opacity))
+                } else {
+                    Text("Take full control of your finances")
+                        .font(.system(size: 16))
+                        .foregroundStyle(.white.opacity(0.55))
+                        .multilineTextAlignment(.center)
+                }
             }
         }
     }
@@ -182,31 +202,38 @@ struct PaywallView: View {
     private var featuresSection: some View {
         VStack(spacing: 0) {
             FeatureRow(
-                icon:  "sparkles",
+                icon:  "chart.bar.doc.horizontal.fill",
                 color: Color(hex: "A99CF5"),
+                title: "All 9 AI Insights",
+                subtitle: "Anomaly detection, trends, behavioral analysis & more"
+            )
+            rowDivider
+            FeatureRow(
+                icon:  "sparkles",
+                color: Color(hex: "9B8BF4"),
                 title: "50 AI messages / day",
-                subtitle: "Personal finance AI at your fingertips"
+                subtitle: "Personal finance AI — ask anything about your money"
+            )
+            rowDivider
+            FeatureRow(
+                icon:  "arrow.clockwise.circle.fill",
+                color: Color(hex: "7EC8A4"),
+                title: "Recurring transactions",
+                subtitle: "Auto-log rent, subscriptions & bills every cycle"
             )
             rowDivider
             FeatureRow(
                 icon:  "paintpalette.fill",
-                color: Color(hex: "7EC8A4"),
-                title: "Customize categories",
-                subtitle: "Personalize icons & colors for every group"
+                color: Color(hex: "F0A070"),
+                title: "Unlimited categories + customization",
+                subtitle: "Free plan: 6 categories · Pro: unlimited with custom icons & colors"
             )
             rowDivider
             FeatureRow(
                 icon:  "arrow.up.arrow.down.circle.fill",
-                color: Color(hex: "F0A070"),
-                title: "Export & import your data",
-                subtitle: "Back up and restore your full financial history"
-            )
-            rowDivider
-            FeatureRow(
-                icon:  "bolt.fill",
-                color: Color(hex: "9B8BF4"),
-                title: "Faster, smarter AI responses",
-                subtitle: "Priority processing for Pro members"
+                color: Color(hex: "5B8DB8"),
+                title: "Full history + export / import",
+                subtitle: "Free: 30-day view · Pro: unlimited history & JSON backup"
             )
         }
         .padding(.vertical, 6)

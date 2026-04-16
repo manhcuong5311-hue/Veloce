@@ -11,6 +11,8 @@ struct VeloceApp: App {
     @StateObject private var notifMgr    = NotificationManager.shared
     @StateObject private var ratingMgr   = RatingManager.shared
 
+    @Environment(\.scenePhase) private var scenePhase
+
     init() {
         FirebaseApp.configure()
     }
@@ -23,6 +25,17 @@ struct VeloceApp: App {
                 .environmentObject(vm)
                 .environmentObject(notifMgr)
                 .environmentObject(ratingMgr)
+                .task {
+                    try? await CurrencyManager.shared.refreshRates()
+                }
+        }
+        // Drain any pending background writes before the OS can freeze / terminate the app.
+        // This covers the window between a debounced Combine fire and the queue executing.
+        .onChange(of: scenePhase) { _, newPhase in
+            if newPhase == .inactive || newPhase == .background {
+                print("[VeloceApp] scenePhase → \(newPhase) — flushing persistence queue")
+                PersistenceStore.shared.flush()
+            }
         }
     }
 }

@@ -19,10 +19,14 @@ struct AIAssistantView: View {
     @Environment(\.dismiss) private var dismiss
 
     var autoSendPrompt: String? = nil
+    /// When true the first auto-sent message (from an insight card) is free —
+    /// it does not consume a slot from the free user's 3-message daily allowance.
+    var isInsightPrompt: Bool = false
 
-    @State private var messages:  [ChatMessage] = []
-    @State private var inputText  = ""
-    @State private var isThinking = false
+    @State private var messages:        [ChatMessage] = []
+    @State private var inputText        = ""
+    @State private var isThinking       = false
+    @State private var insightFreeUsed  = false   // tracks if the free insight message was spent
     @FocusState private var inputFocused: Bool
 
     var body: some View {
@@ -225,7 +229,12 @@ struct AIAssistantView: View {
         let text = inputText.trimmingCharacters(in: .whitespaces)
         guard !text.isEmpty else { return }
 
-        if !subManager.canUseAI {
+        // Determine if this send should be counted against the AI limit.
+        // The FIRST message in an insight-card session (the auto-prompt) is free
+        // so free users get a taste of AI insights before hitting the wall.
+        let isFreeInsightSend = isInsightPrompt && !insightFreeUsed && !subManager.isProUser
+
+        if !isFreeInsightSend && !subManager.canUseAI {
             if subManager.isProUser {
                 // Silent soft-cap — never mention the number
                 messages.append(ChatMessage(
@@ -244,7 +253,12 @@ struct AIAssistantView: View {
         inputText = ""
         inputFocused = false
         messages.append(ChatMessage(role: .user, content: text))
-        subManager.recordAIUsage()
+
+        if isFreeInsightSend {
+            insightFreeUsed = true   // only the first insight message is free
+        } else {
+            subManager.recordAIUsage()
+        }
 
         isThinking = true
         Task {

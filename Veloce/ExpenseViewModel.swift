@@ -24,14 +24,24 @@ final class ExpenseViewModel: ObservableObject {
 
     // MARK: Published
 
-    @Published var categories: [Category] = []
-    @Published var expenses:   [Expense]  = []
+    @Published var categories:         [Category]         = []
+    @Published var expenses:           [Expense]          = []
+    @Published var recurringExpenses:  [RecurringExpense] = []
     @Published var highlightedCategoryId: UUID? = nil
     @Published var isHeightRelative = false
+
+    /// Set to true when the 20th expense is added (free users → show paywall).
+    @Published var softPaywallTrigger: Bool = false
 
     // Settings — @Published so any view binding to vm updates reactively
     @Published var monthlyIncome: Double = 0
     @Published var savingGoal:    Double = 0
+
+    // MARK: Free-tier constants
+    /// Max categories a free user can create.
+    static let freeCategoryLimit = 6
+    /// History window (days) shown to free users.
+    static let freeHistoryDays   = 30
 
     // Combine auto-save
     private var cancellables = Set<AnyCancellable>()
@@ -105,6 +115,11 @@ final class ExpenseViewModel: ObservableObject {
     func addExpense(_ expense: Expense) {
         expenses.append(expense)
         adjustSpent(categoryId: expense.categoryId, delta: +expense.amount)
+        // Sync write: guarantees the expense reaches disk before this function returns,
+        // surviving an immediate force-kill. adjustSpent triggers the $categories sink
+        // which enqueues an async categories write; saveQueue.sync below drains that
+        // write first, so both files are committed atomically from the caller's view.
+        PersistenceStore.shared.saveExpensesSync(expenses)
         highlight(expense.categoryId)
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
 
@@ -120,6 +135,11 @@ final class ExpenseViewModel: ObservableObject {
         RatingManager.shared.recordFirstTransaction()
         RatingManager.shared.recordActiveDay()
         RatingManager.shared.evaluateAfterPositiveAction()
+
+        // Soft paywall: fire once when the user reaches 20 expenses
+        if !softPaywallTrigger && expenses.count == 20 {
+            softPaywallTrigger = true
+        }
     }
 
     func deleteExpense(_ expense: Expense) {
@@ -127,6 +147,7 @@ final class ExpenseViewModel: ObservableObject {
         withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
             expenses.removeAll { $0.id == expense.id }
         }
+        PersistenceStore.shared.saveExpensesSync(expenses)
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
     }
 
@@ -136,6 +157,7 @@ final class ExpenseViewModel: ObservableObject {
         if let i = expenses.firstIndex(where: { $0.id == updated.id }) {
             expenses[i] = updated
         }
+        PersistenceStore.shared.saveExpensesSync(expenses)
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
     }
 
@@ -190,26 +212,55 @@ final class ExpenseViewModel: ObservableObject {
         categories[i].budget = newBudget
     }
 
+    /// Creates a new category, appends it, and **synchronously** commits to disk.
+    /// The sync write guarantees the group survives an immediate force-kill.
+    func addCategory(_ category: Category) {
+        print("[ExpenseViewModel] addCategory: '\(category.name)' — appending")
+        withAnimation(.spring(response: 0.3)) {
+            categories.append(category)
+        }
+        PersistenceStore.shared.saveCategoriesSync(categories)
+        print("[ExpenseViewModel] addCategory: '\(category.name)' ✅ persisted (\(categories.count) total)")
+    }
+
     func updateCategory(_ updated: Category) {
         guard let i = categories.firstIndex(where: { $0.id == updated.id }) else { return }
+        print("[ExpenseViewModel] updateCategory: '\(updated.name)'")
         withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
             categories[i] = updated
         }
+        PersistenceStore.shared.saveCategoriesSync(categories)
+        print("[ExpenseViewModel] updateCategory: '\(updated.name)' ✅ persisted")
     }
 
     func deleteExpenses(_ items: [Expense]) {
         for exp in items { deleteExpense(exp) }
     }
 
+    func deleteCategory(id: UUID) {
+        // Expenses that referenced this category keep their categoryId but will no longer
+        // appear in any category's budget tracking. They remain visible in the timeline.
+        let name = categories.first(where: { $0.id == id })?.name ?? id.uuidString
+        print("[ExpenseViewModel] deleteCategory: '\(name)'")
+        withAnimation(.spring(response: 0.3)) {
+            categories.removeAll { $0.id == id }
+        }
+        PersistenceStore.shared.saveCategoriesSync(categories)
+        print("[ExpenseViewModel] deleteCategory: '\(name)' ✅ persisted (\(categories.count) remaining)")
+    }
+
     func toggleCategoryVisibility(id: UUID) {
         guard let i = categories.firstIndex(where: { $0.id == id }) else { return }
         withAnimation(.spring(response: 0.3)) { categories[i].isHidden.toggle() }
+        PersistenceStore.shared.saveCategoriesSync(categories)
     }
 
     func reorderCategories(from source: IndexSet, to destination: Int) {
         withAnimation(.spring(response: 0.3)) {
             categories.move(fromOffsets: source, toOffset: destination)
         }
+        PersistenceStore.shared.saveCategoriesSync(categories)
+        print("[ExpenseViewModel] reorderCategories ✅ persisted")
     }
 
     func moveCategory(id: UUID, by direction: Int) {
@@ -219,6 +270,7 @@ final class ExpenseViewModel: ObservableObject {
         withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
             categories.swapAt(i, j)
         }
+        PersistenceStore.shared.saveCategoriesSync(categories)
     }
 
     // MARK: Export / Import
@@ -259,8 +311,8 @@ final class ExpenseViewModel: ObservableObject {
             self.savingGoal    = payload.savingGoal
         }
         let store = PersistenceStore.shared
-        store.saveCategories(rebuilt)
-        store.saveExpenses(payload.expenses)
+        store.saveCategoriesSync(rebuilt)
+        store.saveExpensesSync(payload.expenses)
         store.saveMonthlyIncome(payload.monthlyIncome)
         store.saveSavingGoal(payload.savingGoal)
     }
@@ -410,6 +462,53 @@ final class ExpenseViewModel: ObservableObject {
         return YearlyInsight(year: year, totalSpent: totalSpent, totalSaved: totalSaved, months: all)
     }
 
+    // MARK: - History filter (free: 30 days, pro: all)
+
+    /// Returns expenses visible to the current tier.
+    /// Pass `isPro` from SubscriptionManager to avoid a direct dependency.
+    func filteredExpenses(isPro: Bool) -> [Expense] {
+        guard !isPro else { return expenses }
+        let cutoff = Calendar.current.date(byAdding: .day, value: -Self.freeHistoryDays, to: Date()) ?? Date()
+        return expenses.filter { $0.date >= cutoff }
+    }
+
+    // MARK: - Recurring Expenses
+
+    func addRecurring(_ item: RecurringExpense) {
+        recurringExpenses.append(item)
+        PersistenceStore.shared.saveRecurringSync(recurringExpenses)
+    }
+
+    func deleteRecurring(_ item: RecurringExpense) {
+        recurringExpenses.removeAll { $0.id == item.id }
+        PersistenceStore.shared.saveRecurringSync(recurringExpenses)
+    }
+
+    func updateRecurring(_ updated: RecurringExpense) {
+        guard let i = recurringExpenses.firstIndex(where: { $0.id == updated.id }) else { return }
+        recurringExpenses[i] = updated
+        PersistenceStore.shared.saveRecurringSync(recurringExpenses)
+    }
+
+    /// Called on app foreground — auto-adds any overdue recurring expenses
+    /// and advances their next-due date.
+    func processOverdueRecurring() {
+        var changed = false
+        for i in recurringExpenses.indices where recurringExpenses[i].isDue {
+            let r = recurringExpenses[i]
+            addExpense(Expense(
+                title:      r.title,
+                amount:     r.amount,
+                categoryId: r.categoryId,
+                date:       r.nextDueDate,
+                note:       r.note.isEmpty ? "Auto-added (recurring)" : r.note
+            ))
+            recurringExpenses[i].advance()
+            changed = true
+        }
+        if changed { PersistenceStore.shared.saveRecurringSync(recurringExpenses) }
+    }
+
     // MARK: Private helpers
 
     private func adjustSpent(categoryId: UUID, delta: Double) {
@@ -459,20 +558,23 @@ final class ExpenseViewModel: ObservableObject {
             return c
         }
 
-        self.categories = reconciledCategories
-        self.expenses   = loadedExpenses
-        _monthlyIncome  = Published(wrappedValue: store.loadMonthlyIncome())
-        _savingGoal     = Published(wrappedValue: store.loadSavingGoal())
+        self.categories        = reconciledCategories
+        self.expenses          = loadedExpenses
+        self.recurringExpenses = store.loadRecurring() ?? []
+        _monthlyIncome         = Published(wrappedValue: store.loadMonthlyIncome())
+        _savingGoal            = Published(wrappedValue: store.loadSavingGoal())
 
         // Persist reconciled categories immediately if they diverged from stored state.
         if reconciledCategories != rawCategories {
             store.saveCategories(reconciledCategories)
         }
 
-        // Auto-save whenever published properties change (debounced 400 ms)
+        // Auto-save whenever published properties change.
+        // Categories: no debounce — structural data must reach disk quickly.
+        // All structural mutations (add/edit/delete/reorder) also call saveCategoriesSync()
+        // directly, so this sink is a belt-and-suspenders fallback for any missed path.
         $categories
             .dropFirst()                         // skip the initial assignment
-            .debounce(for: .milliseconds(400), scheduler: RunLoop.main)
             .sink { store.saveCategories($0) }
             .store(in: &cancellables)
 
@@ -492,6 +594,22 @@ final class ExpenseViewModel: ObservableObject {
             .dropFirst()
             .debounce(for: .milliseconds(400), scheduler: RunLoop.main)
             .sink { store.saveSavingGoal($0) }
+            .store(in: &cancellables)
+
+        // Widget data — refresh whenever totals or currency may have changed.
+        Publishers.CombineLatest($categories, $expenses)
+            .dropFirst()
+            .debounce(for: .milliseconds(600), scheduler: RunLoop.main)
+            .sink { [weak self] cats, _ in
+                guard let self else { return }
+                let widgetData = VeloceWidgetData(
+                    totalBudget: cats.reduce(0) { $0 + $1.budget },
+                    totalSpent:  cats.reduce(0) { $0 + $1.spent  },
+                    currency:    AppCurrency.current.rawValue,
+                    updatedAt:   Date()
+                )
+                store.saveWidgetData(widgetData)
+            }
             .store(in: &cancellables)
     }
 }

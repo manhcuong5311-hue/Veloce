@@ -164,6 +164,36 @@ final class SubscriptionManager: ObservableObject {
         UserDefaults.standard.set(aiMessagesUsedToday, forKey: aiCountKey)
     }
 
+    // MARK: - 7-day install paywall trigger
+
+    private let installDateKey  = "veloce_install_date"
+    private let day7ShownKey    = "veloce_day7_paywall_shown"
+
+    /// True when the user has been installed for ≥7 days, is free, and hasn't
+    /// seen the install-anniversary paywall yet.
+    var shouldShowDay7Paywall: Bool {
+        guard !isProUser else { return false }
+        guard !UserDefaults.standard.bool(forKey: day7ShownKey) else { return false }
+        let days = Calendar.current.dateComponents([.day], from: installDate, to: Date()).day ?? 0
+        return days >= 7
+    }
+
+    func markDay7PaywallShown() {
+        UserDefaults.standard.set(true, forKey: day7ShownKey)
+    }
+
+    /// The date the app was first launched. Recorded on first call.
+    private var installDate: Date {
+        let ud  = UserDefaults.standard
+        let iso = ISO8601DateFormatter()
+        if let str = ud.string(forKey: installDateKey), let date = iso.date(from: str) {
+            return date
+        }
+        let now = Date()
+        ud.set(iso.string(from: now), forKey: installDateKey)
+        return now
+    }
+
     // MARK: - Dev / Simulator helpers (no StoreKit config)
 
     func mockUnlockPro() {
