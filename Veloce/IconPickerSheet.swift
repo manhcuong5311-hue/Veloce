@@ -91,12 +91,13 @@ struct IconPickerSheet: View {
                     .padding(.bottom, 24)
                 }
             }
-            .navigationTitle("Choose Icon")
+            .navigationTitle(String(localized: "choose_icon_title"))
             .navigationBarTitleDisplayMode(.inline)
             .searchable(text: $searchText, prompt: "Search icons…")
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button("Done") { dismiss() }
+                    Button(String(localized: "done"))
+                         { dismiss() }
                         .font(.system(size: 15, weight: .semibold))
                         .foregroundStyle(VeloceTheme.accent)
                 }
@@ -186,7 +187,7 @@ struct IconPickerSheet: View {
             Image(systemName: "magnifyingglass")
                 .font(.system(size: 32, weight: .light))
                 .foregroundStyle(VeloceTheme.textTertiary)
-            Text("No icons match \"\(searchText)\"")
+            Text(String(localized: "no_icons_match \(searchText)"))
                 .font(.system(size: 14))
                 .foregroundStyle(VeloceTheme.textSecondary)
         }

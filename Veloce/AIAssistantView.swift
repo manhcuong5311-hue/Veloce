@@ -49,7 +49,7 @@ struct AIAssistantView: View {
                     inputBar
                 }
             }
-            .navigationTitle("AI Assistant")
+            .navigationTitle(String(localized: "ai_assistant_title"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { toolbarContent }
         }
@@ -86,15 +86,15 @@ struct AIAssistantView: View {
             // review/edit before sending.
             if !newText.isEmpty { inputText = newText }
         }
-        .alert("Microphone Access", isPresented: $showMicPermissionAlert) {
-            Button("Open Settings") {
+        .alert(String(localized: "microphone_permission_title"), isPresented: $showMicPermissionAlert) {
+            Button(String(localized: "open_settings")) {
                 if let url = URL(string: UIApplication.openSettingsURLString) {
                     UIApplication.shared.open(url)
                 }
             }
-            Button("Cancel", role: .cancel) {}
+            Button(String(localized: "common.cancel"), role: .cancel) {}
         } message: {
-            Text("Allow microphone and speech recognition in Settings to use voice input.")
+            Text(String(localized: "microphone_permission_message"))
         }
     }
 
@@ -105,7 +105,7 @@ struct AIAssistantView: View {
             Image(systemName: "sparkles")
                 .font(.system(size: 12))
                 .foregroundStyle(VeloceTheme.accent)
-            Text("\(subManager.freeAIRemaining) free message\(subManager.freeAIRemaining == 1 ? "" : "s") left today")
+            Text(String(format: String(localized: "ai_free_messages_left_fmt"), subManager.freeAIRemaining))
                 .font(.system(size: 12, weight: .medium))
                 .foregroundStyle(VeloceTheme.textSecondary)
             Spacer()
@@ -164,7 +164,7 @@ struct AIAssistantView: View {
 
     private var suggestionChips: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Suggested questions")
+            Text(String(localized: "ai_suggested_questions"))
                 .font(.system(size: 11, weight: .medium))
                 .foregroundStyle(VeloceTheme.textTertiary)
                 .padding(.horizontal, 2)
@@ -202,7 +202,7 @@ struct AIAssistantView: View {
             }
             Divider().overlay(VeloceTheme.divider)
             HStack(spacing: 10) {
-                TextField("Ask about your finances…", text: $inputText, axis: .vertical)
+                TextField(String(localized: "ai_input_placeholder"), text: $inputText, axis: .vertical)
                     .font(.system(size: 15))
                     .foregroundStyle(VeloceTheme.textPrimary)
                     .tint(VeloceTheme.accent)
@@ -262,12 +262,12 @@ struct AIAssistantView: View {
             Circle()
                 .fill(VeloceTheme.over)
                 .frame(width: 7, height: 7)
-            Text(speech.recognizedText.isEmpty ? "Listening…" : speech.recognizedText)
+            Text(speech.recognizedText.isEmpty ? String(localized: "listening") : speech.recognizedText)
                 .font(.system(size: 13, weight: .medium))
                 .foregroundStyle(VeloceTheme.textPrimary)
                 .lineLimit(1)
             Spacer()
-            Button("Done") {
+            Button(String(localized: "common.done")) {
                 speech.stopListening()
                 // Commit whatever was transcribed so far
                 if !speech.recognizedText.isEmpty { inputText = speech.recognizedText }
@@ -318,7 +318,7 @@ struct AIAssistantView: View {
     @ToolbarContentBuilder
     private var toolbarContent: some ToolbarContent {
         ToolbarItem(placement: .topBarTrailing) {
-            Button("Done") { dismiss() }
+            Button(String(localized: "common.done")) { dismiss() }
                 .font(.system(size: 15, weight: .semibold))
                 .foregroundStyle(VeloceTheme.accent)
         }
@@ -344,12 +344,12 @@ struct AIAssistantView: View {
                 // Silent soft-cap — never mention the number
                 messages.append(ChatMessage(
                     role: .error,
-                    content: "You've reached today's optimal usage limit. Try again tomorrow."
+                    content: String(localized: "ai_daily_limit_pro")
                 ))
             } else {
                 messages.append(ChatMessage(
                     role: .error,
-                    content: "You've used all \(SubscriptionManager.freeAILimit) free messages today. Upgrade to Premium for unlimited AI insights."
+                    content: String(format: String(localized: "ai_daily_limit_free_fmt"), SubscriptionManager.freeAILimit)
                 ))
             }
             return
@@ -404,7 +404,7 @@ struct AIAssistantView: View {
             vm.updateBudget(categoryId: cat.id, newBudget: newBudget)
             messages.append(ChatMessage(
                 role: .assistant,
-                content: "Done! **\(catName)** budget updated to \(newBudget.toCompactCurrency())."
+                content: String(format: String(localized: "ai_budget_updated_fmt"), catName, newBudget.toCompactCurrency())
             ))
         case "open_category":
             // Dismiss the AI sheet so the user lands on the main screen.
@@ -424,14 +424,14 @@ struct AIAssistantView: View {
 
         let statusLine: String
         if remaining < 0 {
-            statusLine = "You're **\((-remaining).toCompactCurrency()) over budget** this month."
+            statusLine = String(format: String(localized: "ai_welcome_over_budget_fmt"), (-remaining).toCompactCurrency())
         } else if pct >= 85 {
-            statusLine = "You've used **\(pct)%** of your monthly budget — almost at the limit."
+            statusLine = String(format: String(localized: "ai_welcome_near_limit_fmt"), pct)
         } else {
-            statusLine = "You've spent **\(totalSpent.toCompactCurrency())** of your **\(totalBudget.toCompactCurrency())** budget (\(pct)% used)."
+            statusLine = String(format: String(localized: "ai_welcome_normal_fmt"), totalSpent.toCompactCurrency(), totalBudget.toCompactCurrency(), pct)
         }
 
-        return "\(statusLine)\n\nHow can I help you today? I can analyze your spending, suggest savings, or help you plan toward your financial goals."
+        return statusLine + "\n\n" + String(localized: "ai_welcome_help_prompt")
     }
 
     private func buildContext() -> AppContext {
@@ -526,16 +526,19 @@ struct AIAssistantView: View {
         if t.contains("over") || t.contains("exceed") || t.contains("vượt") {
             let overCats = vm.categories.filter { $0.isOverBudget }
             if overCats.isEmpty {
-                return "You're within budget on every category. Keep it up!"
+                return String(localized: "ai_fallback_on_track")
             }
-            let list = overCats.map { "**\($0.name)** (over by \(($0.spent - $0.budget).toCompactCurrency()))" }.joined(separator: ", ")
-            return "You're over budget on: \(list)."
+            let list = overCats.map {
+                String(format: String(localized: "ai_fallback_over_by_fmt"), $0.name, ($0.spent - $0.budget).toCompactCurrency())
+            }.joined(separator: ", ")
+            return String(format: String(localized: "ai_fallback_over_budget_fmt"), list)
         }
 
         // Top spending / most expensive
         if t.contains("top") || t.contains("most") || t.contains("highest") || t.contains("biggest") {
             if let top = cats.first {
-                return "Your highest spend this month is **\(top.name)** at **\(top.spent.toCompactCurrency())** (budget: \(top.budget.toCompactCurrency()))."
+                return String(format: String(localized: "ai_fallback_top_category_fmt"),
+                              top.name, top.spent.toCompactCurrency(), top.budget.toCompactCurrency())
             }
         }
 
@@ -545,31 +548,38 @@ struct AIAssistantView: View {
             let income = vm.monthlyIncome
             let projected = income - spent
             if projected >= goal {
-                return "You're on track to save **\(projected.toCompactCurrency())** this month — your goal is \(goal.toCompactCurrency()). Great!"
+                return String(format: String(localized: "ai_fallback_saving_on_track_fmt"),
+                              projected.toCompactCurrency(), goal.toCompactCurrency())
             } else {
-                return "At current spending you'd save **\(max(0, projected).toCompactCurrency())**. To hit your goal of \(goal.toCompactCurrency()) you'd need to cut **\((goal - projected).toCompactCurrency())** more."
+                return String(format: String(localized: "ai_fallback_saving_behind_fmt"),
+                              max(0, projected).toCompactCurrency(), goal.toCompactCurrency(), (goal - projected).toCompactCurrency())
             }
         }
 
         // Category breakdown
         if t.contains("categor") || t.contains("breakdown") || t.contains("detail") {
-            guard !cats.isEmpty else { return "No spending recorded yet. Add your first expense!" }
-            let lines = cats.prefix(5).map { "• **\($0.name)**: \($0.spent.toCompactCurrency()) / \($0.budget.toCompactCurrency())" }
-            return "Here's your spending breakdown:\n" + lines.joined(separator: "\n")
+            guard !cats.isEmpty else { return String(localized: "ai_fallback_no_spending") }
+            let lines = cats.prefix(5).map {
+                String(format: String(localized: "ai_fallback_category_line_fmt"),
+                       $0.name, $0.spent.toCompactCurrency(), $0.budget.toCompactCurrency())
+            }
+            return String(localized: "ai_fallback_breakdown_header") + "\n" + lines.joined(separator: "\n")
         }
 
         // General budget status
         if t.contains("budget") || t.contains("spend") || t.contains("how much") || t.contains("bao nhiêu") {
             let pct = budget > 0 ? Int((spent / budget) * 100) : 0
             if remain < 0 {
-                return "You're **\((-remain).toCompactCurrency()) over budget** this month (\(pct)% used)."
+                return String(format: String(localized: "ai_fallback_budget_over_fmt"),
+                              (-remain).toCompactCurrency(), pct)
             }
-            return "You've spent **\(spent.toCompactCurrency())** of your **\(budget.toCompactCurrency())** budget — \(pct)% used, **\(remain.toCompactCurrency())** remaining."
+            return String(format: String(localized: "ai_fallback_budget_fmt"),
+                          spent.toCompactCurrency(), budget.toCompactCurrency(), pct, remain.toCompactCurrency())
         }
 
         // Default helpful response
         let pct = budget > 0 ? Int((spent / budget) * 100) : 0
-        return "You've spent **\(spent.toCompactCurrency())** this month (\(pct)% of budget). Ask me about your categories, savings, or budget tips!"
+        return String(format: String(localized: "ai_fallback_default_fmt"), spent.toCompactCurrency(), pct)
     }
 
     // MARK: - Dynamic suggestion chips
@@ -589,11 +599,11 @@ struct AIAssistantView: View {
 
         // Static fallbacks ensure chips are always present even with zero data.
         let fallbacks = [
-            "Give me budget tips",
-            "Which category costs me the most?",
-            "Am I on track with my saving goal?",
-            "How can I save more this month?",
-            "Show me my spending breakdown",
+            String(localized: "ai_suggestion_budget_tips"),
+            String(localized: "ai_suggestion_top_category"),
+            String(localized: "ai_suggestion_saving_goal"),
+            String(localized: "ai_suggestion_save_more"),
+            String(localized: "ai_suggestion_breakdown"),
         ]
 
         var result = Array(insightPrompts)
@@ -734,13 +744,13 @@ private struct MessageBubble: View {
     private func actionLabel(_ action: AIAction) -> String {
         switch action.type {
         case "adjust_budget":
-            let cat    = action.categoryName ?? "budget"
+            let cat    = action.categoryName ?? ""
             let amount = action.suggestedAmount.map { " → \($0.toCompactCurrency())" } ?? ""
-            return "Adjust \(cat)\(amount)"
+            return String(format: String(localized: "ai_action_adjust_budget_fmt"), cat, amount)
         case "open_category":
-            return "View \(action.categoryName ?? "category")"
+            return String(format: String(localized: "ai_action_view_category_fmt"), action.categoryName ?? "")
         default:
-            return action.reason ?? "Take action"
+            return action.reason ?? String(localized: "ai_action_take_action")
         }
     }
 

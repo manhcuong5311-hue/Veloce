@@ -1,4 +1,5 @@
 import Foundation
+import SwiftUI
 
 // MARK: - Core Data Models
 
@@ -106,11 +107,11 @@ struct RecurringExpense: Codable, Identifiable {
     enum Frequency: String, Codable, CaseIterable {
         case daily, weekly, monthly
 
-        var label: String {
+        var labelKey: String {
             switch self {
-            case .daily:   return "Daily"
-            case .weekly:  return "Weekly"
-            case .monthly: return "Monthly"
+            case .daily:   return "frequency_daily"
+            case .weekly:  return "frequency_weekly"
+            case .monthly: return "frequency_monthly"
             }
         }
 
@@ -174,4 +175,14 @@ struct VeloceExportData: Codable {
     let expenses:      [Expense]
     let monthlyIncome: Double
     let savingGoal:    Double
+}
+
+extension RecurringExpense.Frequency {
+    var localizedLabel: LocalizedStringKey {
+        switch self {
+        case .daily:   return "frequency_daily"
+        case .weekly:  return "frequency_weekly"
+        case .monthly: return "frequency_monthly"
+        }
+    }
 }

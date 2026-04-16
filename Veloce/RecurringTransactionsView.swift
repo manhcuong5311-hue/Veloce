@@ -131,8 +131,8 @@ private struct RecurringRow: View {
 
     private var nextDueDateLabel: String {
         let cal = Calendar.current
-        if cal.isDateInToday(item.nextDueDate)     { return "Due today" }
-        if cal.isDateInTomorrow(item.nextDueDate)  { return "Tomorrow" }
+        if cal.isDateInToday(item.nextDueDate)     { return String(localized: "recurring_due_today") }
+        if cal.isDateInTomorrow(item.nextDueDate)  { return String(localized: "recurring_due_tomorrow") }
         let f = DateFormatter(); f.dateStyle = .medium; f.timeStyle = .none
         return f.string(from: item.nextDueDate)
     }
@@ -155,7 +155,7 @@ private struct RecurringRow: View {
                 HStack(spacing: 6) {
                     Image(systemName: item.frequency.sfSymbol)
                         .font(.system(size: 10))
-                    Text(item.frequency.label)
+                    Text(item.frequency.localizedLabel)
                         .font(.system(size: 12))
                     Text("·")
                         .foregroundStyle(VeloceTheme.textTertiary)
@@ -260,7 +260,7 @@ struct AddRecurringSheet: View {
                             formRow("Frequency") {
                                 Picker("", selection: $frequency) {
                                     ForEach(RecurringExpense.Frequency.allCases, id: \.self) { f in
-                                        Text(f.label).tag(f)
+                                        Text(f.localizedLabel).tag(f)
                                     }
                                 }
                                 .pickerStyle(.segmented)

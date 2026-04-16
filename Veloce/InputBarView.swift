@@ -30,27 +30,39 @@ struct InputBarView: View {
         .animation(.spring(response: 0.28, dampingFraction: 0.82), value: speech.isListening)
         .animation(.spring(response: 0.22), value: text.isEmpty)
         .animation(.spring(response: 0.22), value: textFocused)
-        .alert("Microphone Access Required", isPresented: $showPermissionAlert) {
-            Button("Open Settings") {
+        
+        .alert(
+            String(localized: "microphone_permission_title"),
+            isPresented: $showPermissionAlert
+        ) {
+            Button(String(localized: "open_settings")) {
                 if let url = URL(string: UIApplication.openSettingsURLString) {
                     UIApplication.shared.open(url)
                 }
             }
-            Button("Cancel", role: .cancel) {}
+            Button(String(localized: "cancel"), role: .cancel) {}
         } message: {
-            Text("Allow microphone and speech recognition access to use voice input.")
+            Text(String(localized: "microphone_permission_message"))
         }
+
+        
         .task { await speech.requestPermissions() }
         .onChange(of: speech.recognizedText) { _, newVal in
             if !newVal.isEmpty { text = newVal }
         }
-        .confirmationDialog("Add Transaction", isPresented: $showAddMenu, titleVisibility: .visible) {
-            Button("Add Expense") { onManualAdd() }
-            Button("Recurring Transaction") { onRecurringAdd() }
-            Button("Cancel", role: .cancel) {}
+        
+        .confirmationDialog(
+            String(localized: "add_transaction_title"),
+            isPresented: $showAddMenu,
+            titleVisibility: .visible
+        ) {
+            Button(String(localized: "add_expense")) { onManualAdd() }
+            Button(String(localized: "recurring_transaction")) { onRecurringAdd() }
+            Button(String(localized: "cancel"), role: .cancel) {}
         } message: {
-            Text("Choose the type of transaction to add")
+            Text(String(localized: "add_transaction_message"))
         }
+        
         .sheet(item: $pendingParsed) { parsed in
             CategoryPickerSheet(parsed: parsed) {
                 text        = ""
@@ -68,14 +80,18 @@ struct InputBarView: View {
                 .fill(VeloceTheme.over)
                 .frame(width: 7, height: 7)
 
-            Text(speech.recognizedText.isEmpty ? "Listening…" : speech.recognizedText)
+            Text(
+                speech.recognizedText.isEmpty
+                ? String(localized: "listening")
+                : speech.recognizedText
+            )
                 .font(.system(size: 13, weight: .medium))
                 .foregroundStyle(VeloceTheme.textPrimary)
                 .lineLimit(1)
 
             Spacer()
 
-            Button("Done") { finishListening() }
+            Button(String(localized:"common.done")) { finishListening() }
                 .font(.system(size: 13, weight: .semibold))
                 .foregroundStyle(VeloceTheme.accent)
         }
@@ -91,7 +107,8 @@ struct InputBarView: View {
 
             // ── Text field ───────────────────────────────────────
             HStack(spacing: 8) {
-                TextField("Ăn phở 50k, Grab 30k…", text: $text)
+                TextField(String(localized: "quick_input_placeholder"), text: $text)
+
                     .font(.system(size: 15))
                     .foregroundStyle(VeloceTheme.textPrimary)
                     .tint(VeloceTheme.accent)
@@ -301,7 +318,7 @@ struct CategoryPickerSheet: View {
                                     .font(.system(size: 16, weight: .semibold))
                                     .foregroundStyle(VeloceTheme.textPrimary)
                                     .lineLimit(1)
-                                Text("Which group does this belong to?")
+                                Text(String(localized: "choose_group_question"))
                                     .font(.system(size: 13))
                                     .foregroundStyle(VeloceTheme.textSecondary)
                             }
@@ -349,11 +366,11 @@ struct CategoryPickerSheet: View {
                     .padding(.bottom, 24)
                 }
             }
-            .navigationTitle("Choose Group")
+            .navigationTitle(String(localized: "choose_group_title"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    Button("Cancel") { dismiss() }
+                    Button(String(localized:"common.cancel")) { dismiss() }
                         .foregroundStyle(VeloceTheme.textSecondary)
                 }
             }

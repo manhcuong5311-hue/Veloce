@@ -251,11 +251,11 @@ private struct GroupEditSheet: View {
                     .padding(.bottom, 24)
                 }
             }
-            .navigationTitle("Edit Group")
+            .navigationTitle(String(localized: "edit_group_title"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    Button("Cancel") { dismiss() }
+                    Button(String(localized: "cancel")) { dismiss() }
                         .foregroundStyle(VeloceTheme.textSecondary)
                 }
             }
@@ -320,13 +320,15 @@ private struct GroupEditSheet: View {
                 if subManager.isProUser {
                     HStack(spacing: 4) {
                         Image(systemName: "hand.tap.fill").font(.system(size: 10))
-                        Text("Tap icon to customize").font(.system(size: 12))
+                        Text(String(localized: "tap_icon_customize"))
+                            .font(.system(size: 12))
                     }
                     .foregroundStyle(VeloceTheme.accent.opacity(0.8))
                 } else {
                     HStack(spacing: 4) {
                         Image(systemName: "lock.fill").font(.system(size: 9))
-                        Text("Premium: unlock icon & color").font(.system(size: 12))
+                        Text(String(localized: "premium_unlock_icon_color"))
+                            .font(.system(size: 12))
                     }
                     .foregroundStyle(VeloceTheme.textSecondary)
                 }
@@ -340,7 +342,7 @@ private struct GroupEditSheet: View {
 
     private var budgetSection: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text("Spending Limit")
+            Text(String(localized: "spending_limit"))
                 .font(.system(size: 13, weight: .semibold))
                 .foregroundStyle(VeloceTheme.textSecondary)
 
@@ -375,7 +377,7 @@ private struct GroupEditSheet: View {
 
             HStack(spacing: 10) {
                 Image(systemName: "pencil").font(.system(size: 13)).foregroundStyle(VeloceTheme.textTertiary)
-                TextField("Custom amount", text: $budgetText)
+                TextField(String(localized: "custom_amount_placeholder"), text: $budgetText)
                     .keyboardType(.numberPad)
                     .font(.system(size: 16, weight: .semibold, design: .rounded))
                     .foregroundStyle(VeloceTheme.textPrimary)
@@ -409,7 +411,7 @@ private struct GroupEditSheet: View {
         VStack(alignment: .leading, spacing: 14) {
             // Header row with Premium badge when locked
             HStack {
-                Text("Color")
+                Text(String(localized: "color"))
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(VeloceTheme.textSecondary)
                 Spacer()
@@ -417,7 +419,8 @@ private struct GroupEditSheet: View {
                     Button(action: { showPaywall = true }) {
                         HStack(spacing: 4) {
                             Image(systemName: "lock.fill").font(.system(size: 9, weight: .bold))
-                            Text("Premium").font(.system(size: 11, weight: .semibold))
+                            Text(String(localized: "premium"))
+                                .font(.system(size: 11, weight: .semibold))
                         }
                         .foregroundStyle(VeloceTheme.accent)
                         .padding(.horizontal, 8)
@@ -483,7 +486,7 @@ private struct GroupEditSheet: View {
                     Image(systemName: "eyedropper")
                         .font(.system(size: 13))
                         .foregroundStyle(VeloceTheme.textSecondary)
-                    Text("Custom")
+                    Text(String(localized: "custom"))
                         .font(.system(size: 13, weight: .medium))
                         .foregroundStyle(VeloceTheme.textSecondary)
                     Spacer()
@@ -504,7 +507,7 @@ private struct GroupEditSheet: View {
 
     private var saveButton: some View {
         Button(action: save) {
-            Text("Save Changes")
+            Text(String(localized: "save_changes"))
                 .font(.system(size: 16, weight: .semibold))
                 .foregroundStyle(.white)
                 .frame(maxWidth: .infinity)
@@ -577,7 +580,7 @@ private struct NewGroupSheet: View {
                             }
                             .buttonStyle(.plain)
 
-                            TextField("Group name", text: $name)
+                            TextField(String(localized: "group_name_placeholder"), text: $name)
                                 .font(.system(size: 20, weight: .semibold))
                                 .foregroundStyle(VeloceTheme.textPrimary)
                                 .multilineTextAlignment(.center)
@@ -589,12 +592,12 @@ private struct NewGroupSheet: View {
 
                         // Budget
                         VStack(alignment: .leading, spacing: 10) {
-                            Text("Monthly Budget")
+                            Text(String(localized: "monthly_budget"))
                                 .font(.system(size: 13, weight: .semibold))
                                 .foregroundStyle(VeloceTheme.textSecondary)
                             HStack {
                                 Image(systemName: "pencil").foregroundStyle(VeloceTheme.textTertiary)
-                                TextField("Amount", text: $budgetText)
+                                TextField(String(localized: "amount_placeholder"), text: $budgetText)
                                     .keyboardType(.numberPad)
                                     .font(.system(size: 16, weight: .semibold, design: .rounded))
                                     .foregroundStyle(VeloceTheme.textPrimary)
@@ -621,7 +624,7 @@ private struct NewGroupSheet: View {
 
                         // Color picker (Pro only for full grid; everyone gets a color)
                         VStack(alignment: .leading, spacing: 12) {
-                            Text("Color")
+                            Text(String(localized: "color"))
                                 .font(.system(size: 13, weight: .semibold))
                                 .foregroundStyle(VeloceTheme.textSecondary)
                             LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 6), spacing: 10) {
@@ -655,7 +658,7 @@ private struct NewGroupSheet: View {
                                 Image(systemName: "eyedropper")
                                     .font(.system(size: 13))
                                     .foregroundStyle(VeloceTheme.textSecondary)
-                                Text("Custom")
+                                Text(String(localized: "custom"))
                                     .font(.system(size: 13, weight: .medium))
                                     .foregroundStyle(VeloceTheme.textSecondary)
                                 Spacer()
@@ -671,7 +674,7 @@ private struct NewGroupSheet: View {
                         .veloceCard()
 
                         Button(action: save) {
-                            Text("Create Group")
+                            Text(String(localized: "create_group"))
                                 .font(.system(size: 16, weight: .semibold))
                                 .foregroundStyle(.white)
                                 .frame(maxWidth: .infinity)
@@ -687,11 +690,12 @@ private struct NewGroupSheet: View {
                     .padding(.bottom, 24)
                 }
             }
-            .navigationTitle("New Group")
+            .navigationTitle(String(localized: "new_group_title"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    Button("Cancel") { dismiss() }.foregroundStyle(VeloceTheme.textSecondary)
+                    Button(String(localized: "cancel")) { dismiss() }
+                        .foregroundStyle(VeloceTheme.textSecondary)
                 }
             }
         }

@@ -180,6 +180,169 @@ struct SpeechLanguage: Identifiable, Hashable {
     }
 }
 
+// MARK: - Category Localization
+
+/// Localised category names and locale-based currency detection for first launch.
+/// The English keys ("Food", "Transport" …) are treated as stable system identifiers
+/// stored in the Category model; display names are derived from this table.
+enum CategoryLocalization {
+
+    // MARK: Name lookup
+
+    /// Returns the display name for an English category key in the given BCP-47 language code.
+    /// Falls back to the English key if no translation exists.
+    static func name(for key: String, langCode: String) -> String {
+        let lang = langCode.count >= 2 ? String(langCode.prefix(2)) : langCode
+        return table[key]?[lang] ?? key
+    }
+
+    /// All known names for a key (English + every translation).
+    /// Used by `resolveCategory` to match a detected English key against
+    /// a category that may be stored with a localised name.
+    static func allNames(for key: String) -> [String] {
+        var names: [String] = [key]
+        if let translations = table[key] { names.append(contentsOf: translations.values) }
+        return names
+    }
+
+    // MARK: Locale → currency
+
+    /// Infers the best default `AppCurrency` from the device region.
+    /// Only called on first launch (when no currency key is saved yet).
+    static func defaultCurrency() -> AppCurrency {
+        let region = Locale.current.region?.identifier ?? ""
+        switch region {
+        case "VN":                              return .vnd
+        case "JP":                              return .jpy
+        case "KR":                              return .krw
+        case "TH":                              return .thb
+        case "SG":                              return .sgd
+        case "GB":                              return .gbp
+        case "US", "CA", "AU", "NZ",
+             "PH", "IN", "MX", "BR",
+             "AR", "CL", "CO", "PE":           return .usd
+        default:
+            // Euro-zone countries
+            let euroZone: Set<String> = [
+                "DE","FR","ES","IT","NL","BE","PT","AT","FI",
+                "GR","IE","LU","SI","SK","EE","LV","LT","CY","MT"
+            ]
+            return euroZone.contains(region) ? .eur : .usd
+        }
+    }
+
+    /// Infers the best default speech-recognition language code from the device locale.
+    static func defaultSpeechCode() -> String {
+        let lang = Locale.current.language.languageCode?.identifier ?? "en"
+        let region = Locale.current.region?.identifier ?? ""
+        switch lang {
+        case "vi": return "vi-VN"
+        case "zh": return "zh-CN"
+        case "ja": return "ja-JP"
+        case "ko": return "ko-KR"
+        case "fr": return "fr-FR"
+        case "es": return "es-ES"
+        case "th": return "th-TH"
+        case "de": return "de-DE"
+        case "en": return region == "GB" ? "en-GB" : "en-US"
+        default:   return "en-US"
+        }
+    }
+
+    // MARK: Default budgets per currency
+
+    /// Sensible default monthly budgets (rounded to local-feeling amounts).
+    /// Order: Food, Transport, Shopping, Bills, Health, Entertainment, Other
+    static func defaultBudgets(for currency: AppCurrency) -> [Double] {
+        switch currency {
+        case .vnd: return [3_000_000, 1_500_000, 2_000_000, 2_500_000, 1_000_000, 1_000_000,   500_000]
+        case .usd: return [      300,       150,       200,       250,       100,       100,        50]
+        case .eur: return [      280,       140,       180,       230,        90,        90,        45]
+        case .jpy: return [   36_000,    18_000,    24_000,    30_000,    12_000,    12_000,     6_000]
+        case .gbp: return [      240,       120,       160,       200,        80,        80,        40]
+        case .krw: return [  400_000,   200_000,   260_000,   330_000,   130_000,   130_000,    65_000]
+        case .sgd: return [      400,       200,       270,       340,       135,       135,        65]
+        case .thb: return [   10_000,     5_000,     7_000,     8_500,     3_500,     3_500,     1_750]
+        }
+    }
+
+    // MARK: Translation table
+    // key: English system name   inner key: 2-letter ISO 639-1 language code
+
+    private static let table: [String: [String: String]] = [
+        "Food": [
+            "vi": "Ăn uống",
+            "zh": "餐饮",
+            "ja": "食費",
+            "ko": "식비",
+            "fr": "Alimentation",
+            "es": "Comida",
+            "th": "อาหาร",
+            "de": "Essen",
+        ],
+        "Transport": [
+            "vi": "Di chuyển",
+            "zh": "交通",
+            "ja": "交通費",
+            "ko": "교통비",
+            "fr": "Transport",
+            "es": "Transporte",
+            "th": "การเดินทาง",
+            "de": "Transport",
+        ],
+        "Shopping": [
+            "vi": "Mua sắm",
+            "zh": "购物",
+            "ja": "ショッピング",
+            "ko": "쇼핑",
+            "fr": "Shopping",
+            "es": "Compras",
+            "th": "ช้อปปิ้ง",
+            "de": "Einkaufen",
+        ],
+        "Bills": [
+            "vi": "Hoá đơn",
+            "zh": "账单",
+            "ja": "光熱費",
+            "ko": "공과금",
+            "fr": "Factures",
+            "es": "Facturas",
+            "th": "ค่าบิล",
+            "de": "Rechnungen",
+        ],
+        "Health": [
+            "vi": "Sức khoẻ",
+            "zh": "健康",
+            "ja": "医療費",
+            "ko": "건강",
+            "fr": "Santé",
+            "es": "Salud",
+            "th": "สุขภาพ",
+            "de": "Gesundheit",
+        ],
+        "Entertainment": [
+            "vi": "Giải trí",
+            "zh": "娱乐",
+            "ja": "娯楽",
+            "ko": "여가",
+            "fr": "Loisirs",
+            "es": "Entretenimiento",
+            "th": "บันเทิง",
+            "de": "Unterhaltung",
+        ],
+        "Other": [
+            "vi": "Khác",
+            "zh": "其他",
+            "ja": "その他",
+            "ko": "기타",
+            "fr": "Autre",
+            "es": "Otros",
+            "th": "อื่นๆ",
+            "de": "Sonstiges",
+        ],
+    ]
+}
+
 // MARK: - Design Tokens
 
 enum VeloceTheme {

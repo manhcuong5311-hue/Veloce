@@ -92,7 +92,7 @@ final class RatingManager: ObservableObject {
         // Request native review dialog
         if let scene = UIApplication.shared.connectedScenes
             .compactMap({ $0 as? UIWindowScene }).first {
-            SKStoreReviewController.requestReview(in: scene)
+            Task { await AppStore.requestReview(in: scene) }
         }
     }
 
@@ -106,9 +106,6 @@ final class RatingManager: ObservableObject {
 
     private func shouldPrompt() -> Bool {
         // Hard cap: 3 per year
-        let yearStart = Calendar.current.date(
-            from: Calendar.current.dateComponents([.year], from: Date())
-        ) ?? Date()
         let yearPromptCount = promptCount  // simplified: track total, Apple enforces per-year internally
         guard yearPromptCount < maxPromptsPerYear else { return false }
 

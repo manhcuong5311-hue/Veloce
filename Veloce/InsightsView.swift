@@ -60,11 +60,11 @@ struct InsightsView: View {
                     .padding(.top, 12)
                 }
             }
-            .navigationTitle("Insights")
+            .navigationTitle(String(localized: "insights_title"))
             .navigationBarTitleDisplayMode(.large)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button("Done") { dismiss() }
+                    Button(String(localized: "common.done")) { dismiss() }
                         .font(.system(size: 15, weight: .semibold))
                         .foregroundStyle(VeloceTheme.accent)
                 }
@@ -91,7 +91,7 @@ struct InsightsView: View {
 
         return HStack(spacing: 0) {
             summaryPill(
-                label: "Spent",
+                label: "insights_spent",
                 value: current.totalSpent.toCompactCurrency(),
                 color: VeloceTheme.textPrimary
             )
@@ -99,7 +99,7 @@ struct InsightsView: View {
             stripDivider
 
             summaryPill(
-                label: "Saved",
+                label: "insights_saved",
                 value: current.totalSaved.toCompactCurrency(),
                 color: VeloceTheme.ok
             )
@@ -107,7 +107,7 @@ struct InsightsView: View {
             if current.income > 0 {
                 stripDivider
                 summaryPill(
-                    label: "Save Rate",
+                    label: "insights_save_rate",
                     value: String(format: "%.0f%%", current.savingRate),
                     color: current.savingRate >= 20 ? VeloceTheme.ok : VeloceTheme.caution
                 )
@@ -118,7 +118,7 @@ struct InsightsView: View {
                 let pct   = abs(delta) / prev.totalSpent * 100
                 stripDivider
                 summaryPill(
-                    label: "vs Last Month",
+                    label: "insights_vs_last_month",
                     value: "\(delta >= 0 ? "+" : "-")\(String(format: "%.0f", pct))%",
                     color: delta <= 0 ? VeloceTheme.ok : VeloceTheme.over
                 )
@@ -170,7 +170,7 @@ struct InsightsView: View {
                 if subManager.isProUser && cards.count > 5 && !showAllCards {
                     Button(action: { withAnimation(.spring(response: 0.35)) { showAllCards = true } }) {
                         HStack(spacing: 6) {
-                            Text("Show \(cards.count - 5) more insights")
+                            Text(String(format: String(localized: "insights_show_more_fmt"), cards.count - 5))
                                 .font(.system(size: 14, weight: .semibold))
                             Image(systemName: "chevron.down")
                                 .font(.system(size: 11, weight: .bold))
@@ -199,7 +199,7 @@ struct InsightsView: View {
 
     private var lockedInsightsSection: some View {
         Button(action: {
-            paywallTriggerFeature = "\(proOnlyCards.count) Pro Insight\(proOnlyCards.count == 1 ? "" : "s")"
+            paywallTriggerFeature = String(format: String(localized: "insights_pro_count_fmt"), proOnlyCards.count)
             showPaywall = true
         }) {
             VStack(spacing: 0) {
@@ -225,16 +225,16 @@ struct InsightsView: View {
                             .foregroundStyle(VeloceTheme.accent)
                     }
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("\(proOnlyCards.count) more Pro insight\(proOnlyCards.count == 1 ? "" : "s") available")
+                        Text(String(format: String(localized: "insights_pro_count_fmt"), proOnlyCards.count))
                             .font(.system(size: 14, weight: .semibold))
                             .foregroundStyle(VeloceTheme.textPrimary)
-                        Text("Anomaly detection, trends, behavioral analysis…")
+                        Text(String(localized: "insights_locked_detail"))
                             .font(.system(size: 12))
                             .foregroundStyle(VeloceTheme.textSecondary)
                             .lineLimit(1)
                     }
                     Spacer()
-                    Text("Unlock")
+                    Text(String(localized: "insights_unlock"))
                         .font(.system(size: 13, weight: .semibold))
                         .foregroundStyle(.white)
                         .padding(.horizontal, 12)
@@ -261,10 +261,10 @@ struct InsightsView: View {
             Image(systemName: "chart.bar.doc.horizontal")
                 .font(.system(size: 36, weight: .light))
                 .foregroundStyle(VeloceTheme.textTertiary)
-            Text("No insights yet")
+            Text(String(localized: "insights_no_insights_title"))
                 .font(.system(size: 16, weight: .semibold))
                 .foregroundStyle(VeloceTheme.textPrimary)
-            Text("Add a few more expenses and insights will appear here.")
+            Text(String(localized: "insights_no_insights_detail"))
                 .font(.system(size: 13))
                 .foregroundStyle(VeloceTheme.textSecondary)
                 .multilineTextAlignment(.center)
@@ -294,7 +294,7 @@ struct InsightsView: View {
 
         return AnyView(
             VStack(alignment: .leading, spacing: 10) {
-                Text("Category Trends")
+                Text(String(localized: "insights_category_trends"))
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(VeloceTheme.textSecondary)
 
@@ -332,7 +332,7 @@ struct InsightsView: View {
             HStack(spacing: 3) {
                 Image(systemName: isFlat ? "minus" : (isUp ? "arrow.up" : "arrow.down"))
                     .font(.system(size: 8, weight: .bold))
-                Text(isFlat ? "Stable" : "\(String(format: "%.0f%%", abs(pct)))")
+                Text(isFlat ? String(localized: "insights_stable") : "\(String(format: "%.0f%%", abs(pct)))")
                     .font(.system(size: 10, weight: .semibold))
             }
             .foregroundStyle(isFlat ? VeloceTheme.textTertiary : (isUp ? VeloceTheme.over : VeloceTheme.ok))
@@ -357,7 +357,7 @@ struct InsightsView: View {
                     Image(systemName: "calendar")
                         .font(.system(size: 13, weight: .semibold))
                         .foregroundStyle(VeloceTheme.accent)
-                    Text("\(String(insight.year)) Year Overview")
+                    Text(String(format: String(localized: "insights_year_overview_fmt"), String(insight.year)))
                         .font(.system(size: 14, weight: .semibold))
                         .foregroundStyle(VeloceTheme.textPrimary)
                     Spacer()
@@ -384,11 +384,11 @@ struct InsightsView: View {
         VStack(spacing: 12) {
             // Stats row
             HStack(spacing: 0) {
-                yearlyStat("Total Spent", insight.totalSpent.toCompactCurrency(), VeloceTheme.textPrimary)
+                yearlyStat("insights_total_spent", insight.totalSpent.toCompactCurrency(), VeloceTheme.textPrimary)
                 Divider().frame(height: 34)
-                yearlyStat("Total Saved", insight.totalSaved.toCompactCurrency(), VeloceTheme.ok)
+                yearlyStat("insights_total_saved", insight.totalSaved.toCompactCurrency(), VeloceTheme.ok)
                 Divider().frame(height: 34)
-                yearlyStat("Monthly Avg", insight.monthlyAverage.toCompactCurrency(), VeloceTheme.accent)
+                yearlyStat("insights_monthly_avg", insight.monthlyAverage.toCompactCurrency(), VeloceTheme.accent)
             }
             .veloceCard(radius: 14, padding: 14)
 
@@ -399,14 +399,14 @@ struct InsightsView: View {
                     if let best = insight.bestMonth {
                         yearlyHighlight(
                             icon: "star.fill", color: VeloceTheme.ok,
-                            label: "Best saving", month: best.shortLabel,
+                            label: "insights_best_saving", month: best.shortLabel,
                             value: best.totalSaved.toCompactCurrency()
                         )
                     }
                     if let worst = insight.worstMonth {
                         yearlyHighlight(
                             icon: "flame.fill", color: VeloceTheme.over,
-                            label: "Highest spend", month: worst.shortLabel,
+                            label: "insights_highest_spend", month: worst.shortLabel,
                             value: worst.totalSpent.toCompactCurrency()
                         )
                     }
@@ -534,13 +534,13 @@ private struct YearlyBarChartView: View {
 
     private var headerRow: some View {
         HStack {
-            Text("Month by Month")
+            Text(String(localized: "insights_month_by_month"))
                 .font(.system(size: 12, weight: .semibold))
                 .foregroundStyle(VeloceTheme.textSecondary)
             Spacer()
             HStack(spacing: 10) {
-                legendDot(VeloceTheme.ok,   "Best saving")
-                legendDot(VeloceTheme.over, "Most spent")
+                legendDot(VeloceTheme.ok,   String(localized: "insights_best_saving"))
+                legendDot(VeloceTheme.over, String(localized: "insights_most_spent"))
             }
         }
     }
@@ -700,11 +700,11 @@ private struct YearlyBarChartView: View {
                     .foregroundStyle(VeloceTheme.textPrimary)
 
                 HStack(spacing: 14) {
-                    tooltipStat("Spent",  month.totalSpent.toCompactCurrency(), VeloceTheme.textPrimary)
+                    tooltipStat(String(localized: "insights_tooltip_spent"),  month.totalSpent.toCompactCurrency(), VeloceTheme.textPrimary)
                     if month.income > 0 {
-                        tooltipStat("Saved",  month.totalSaved.toCompactCurrency(), VeloceTheme.ok)
+                        tooltipStat(String(localized: "insights_tooltip_saved"),  month.totalSaved.toCompactCurrency(), VeloceTheme.ok)
                         tooltipStat(
-                            "Rate",
+                            String(localized: "insights_tooltip_rate"),
                             String(format: "%.0f%%", month.savingRate),
                             month.savingRate >= 20 ? VeloceTheme.ok : VeloceTheme.caution
                         )
@@ -799,7 +799,7 @@ struct InsightCardView: View {
                         HStack(spacing: 4) {
                             Image(systemName: "sparkles")
                                 .font(.system(size: 11, weight: .semibold))
-                            Text("Ask AI")
+                            Text(String(localized: "insights_ask_ai"))
                                 .font(.system(size: 12, weight: .semibold))
                         }
                         .foregroundStyle(VeloceTheme.accent)
@@ -826,14 +826,14 @@ struct InsightCardView: View {
     private var priorityBadge: some View {
         switch card.priority {
         case .risk:
-            Text("RISK")
+            Text(String(localized: "insights_badge_risk"))
                 .font(.system(size: 9, weight: .black))
                 .foregroundStyle(VeloceTheme.over)
                 .padding(.horizontal, 5)
                 .padding(.vertical, 2)
                 .background(VeloceTheme.over.opacity(0.12), in: Capsule())
         case .opportunity:
-            Text("TIP")
+            Text(String(localized: "insights_badge_tip"))
                 .font(.system(size: 9, weight: .black))
                 .foregroundStyle(VeloceTheme.ok)
                 .padding(.horizontal, 5)

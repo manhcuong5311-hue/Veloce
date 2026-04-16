@@ -259,8 +259,11 @@ final class NotificationManager: NSObject, ObservableObject {
         let topLine = topCategory.map { " Top: \($0)." } ?? ""
 
         let content       = UNMutableNotificationContent()
-        content.title     = "Veloce Weekly Digest"
-        content.body      = "This week: spent \(totalSpent.toCompactCurrency()) (\(pct)% of budget).\(topLine)"
+        content.title = String(localized: "weekly_digest_title")
+
+        content.body = String(
+            localized: "weekly_digest_body \(totalSpent.toCompactCurrency()) \(pct) \(topLine)"
+        )
         content.sound     = .default
 
         // Every Monday at 09:00
@@ -353,7 +356,7 @@ extension NotificationManager: UNUserNotificationCenterDelegate {
         didReceive response: UNNotificationResponse,
         withCompletionHandler completionHandler: @escaping () -> Void
     ) {
-        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        Task { @MainActor in UIImpactFeedbackGenerator(style: .medium).impactOccurred() }
         completionHandler()
     }
 }

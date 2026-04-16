@@ -27,13 +27,13 @@ struct ExpenseRowView: View, Equatable {
                 UIImpactFeedbackGenerator(style: .light).impactOccurred()
                 onEdit()
             } label: {
-                Label("Edit", systemImage: "pencil")
+                Label(String(localized: "edit"), systemImage: "pencil")
             }
             Button(role: .destructive) {
                 UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                 onDelete()
             } label: {
-                Label("Delete", systemImage: "trash")
+                Label(String(localized: "delete"), systemImage: "trash")
             }
         }
         .shadow(color: .black.opacity(0.048), radius: 8, x: 0, y: 2)

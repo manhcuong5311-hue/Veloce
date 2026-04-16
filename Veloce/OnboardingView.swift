@@ -52,7 +52,7 @@ struct OnboardingView: View {
 
     private var pageIndicator: some View {
         HStack(spacing: 7) {
-            ForEach(0..<totalPages) { i in
+            ForEach(Array(0..<totalPages), id: \.self) { i in
                 Capsule()
                     .fill(i == page ? VeloceTheme.accent : VeloceTheme.divider)
                     .frame(width: i == page ? 22 : 7, height: 7)
@@ -109,7 +109,7 @@ private struct Page1: View {
                 .opacity(show ? 1 : 0)
 
                 VStack(spacing: 16) {
-                    Text("Track money\nwithout thinking")
+                    Text(String(localized: "onboarding_tagline"))
                         .font(.system(size: 38, weight: .bold, design: .rounded))
                         .foregroundStyle(VeloceTheme.textPrimary)
                         .multilineTextAlignment(.center)
@@ -117,7 +117,7 @@ private struct Page1: View {
                         .offset(y: show ? 0 : 18)
                         .opacity(show ? 1 : 0)
 
-                    Text("Just say it out loud:")
+                    Text(String(localized: "onboarding_voice_hint"))
                         .font(.system(size: 17))
                         .foregroundStyle(VeloceTheme.textSecondary)
                         .offset(y: show ? 0 : 14)
@@ -128,7 +128,7 @@ private struct Page1: View {
                         Image(systemName: "mic.fill")
                             .font(.system(size: 14, weight: .semibold))
                             .foregroundStyle(VeloceTheme.accent)
-                        Text("\"coffee 40k\"")
+                        Text(String(localized: "onboarding_voice_example"))
                             .font(.system(size: 17, weight: .semibold, design: .rounded))
                             .foregroundStyle(VeloceTheme.textPrimary)
                     }
@@ -147,7 +147,7 @@ private struct Page1: View {
             Spacer()
             Spacer()
 
-            primaryButton("Get Started", action: onNext)
+            primaryButton(String(localized: "get_started"), action: onNext)
                 .padding(.horizontal, 28)
                 .padding(.bottom, 56)
                 .offset(y: show ? 0 : 28)
@@ -175,12 +175,12 @@ private struct Page2: View {
 
             VStack(spacing: 32) {
                 VStack(spacing: 12) {
-                    Text("Let's set you up")
+                    Text(String(localized: "onboarding_setup_title"))
                         .font(.system(size: 36, weight: .bold, design: .rounded))
                         .foregroundStyle(VeloceTheme.textPrimary)
                         .multilineTextAlignment(.center)
 
-                    Text("Optional — skip anytime and change later.")
+                    Text(String(localized: "onboarding_optional_note"))
                         .font(.system(size: 15))
                         .foregroundStyle(VeloceTheme.textSecondary)
                         .multilineTextAlignment(.center)

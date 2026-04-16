@@ -179,13 +179,32 @@ final class ExpenseViewModel: ObservableObject {
     }
 
     /// Resolves a detected category name to one of the user's actual categories.
+    ///
+    /// Three-pass strategy so it works whether categories are stored in English
+    /// or in any of the 10 supported languages:
+    ///   1. Exact match (e.g. detected "Food" == stored "Food")
+    ///   2. Substring / contains fuzzy match
+    ///   3. Cross-language match — detected English key is expanded to all its
+    ///      known translations and checked against stored names
+    ///      (e.g. detected "Food" matches stored "食費" / "Ăn uống" / "식비")
     func resolveCategory(_ detectedName: String?) -> Category? {
         guard let name = detectedName else { return nil }
         let lower = name.lowercased()
+
+        // Pass 1 — exact
         if let c = categories.first(where: { $0.name.lowercased() == lower }) { return c }
+
+        // Pass 2 — fuzzy substring
         if let c = categories.first(where: {
             lower.contains($0.name.lowercased()) || $0.name.lowercased().contains(lower)
         }) { return c }
+
+        // Pass 3 — cross-language: expand English key to all translations
+        let variants = CategoryLocalization.allNames(for: name).map { $0.lowercased() }
+        if let c = categories.first(where: { variants.contains($0.name.lowercased()) }) {
+            return c
+        }
+
         return nil
     }
 
@@ -536,15 +555,54 @@ final class ExpenseViewModel: ObservableObject {
 
     // MARK: Default data
 
+    /// Builds the initial category set for a brand-new install.
+    ///
+    /// Two locale-aware things happen here:
+    ///  1. **Currency**: if no currency has been saved yet, the device region
+    ///     is used to pick a sensible default (e.g. JPY for Japan, USD for US).
+    ///     That default is written to UserDefaults immediately so all formatters
+    ///     render the right symbol from the very first frame.
+    ///  2. **Category names**: the device language is used to localise the seven
+    ///     default group names (Food → 食費 for Japanese users, Ăn uống for
+    ///     Vietnamese, etc.).  The English system key is preserved so cross-
+    ///     language keyword matching in `resolveCategory` still works.
     private static func defaultCategories() -> [Category] {
-        [
-            Category(name: "Food",          icon: "fork.knife",           budget: 3_000_000, spent: 0, colorHex: "E07A5F"),
-            Category(name: "Transport",     icon: "car.fill",             budget: 1_500_000, spent: 0, colorHex: "5B8DB8"),
-            Category(name: "Shopping",      icon: "bag.fill",             budget: 2_000_000, spent: 0, colorHex: "9B84D0"),
-            Category(name: "Bills",         icon: "bolt.fill",            budget: 2_500_000, spent: 0, colorHex: "D4A853"),
-            Category(name: "Health",        icon: "heart.fill",           budget: 1_000_000, spent: 0, colorHex: "5BA88C"),
-            Category(name: "Entertainment", icon: "popcorn.fill",         budget: 1_000_000, spent: 0, colorHex: "C97BA8"),
-            Category(name: "Other",         icon: "ellipsis.circle.fill", budget: 500_000,   spent: 0, colorHex: "8A95A8"),
+        // ── 1. Detect & persist default currency (first-launch only) ──────
+        let isFirstLaunch = UserDefaults.standard.string(forKey: "veloce_currency") == nil
+        let currency: AppCurrency
+        if isFirstLaunch {
+            currency = CategoryLocalization.defaultCurrency()
+            UserDefaults.standard.set(currency.rawValue, forKey: "veloce_currency")
+            // Also seed a matching speech-recognition language so voice input
+            // works in the user's language out-of-the-box.
+            if UserDefaults.standard.string(forKey: "veloce_speech_language") == nil {
+                UserDefaults.standard.set(
+                    CategoryLocalization.defaultSpeechCode(),
+                    forKey: "veloce_speech_language"
+                )
+            }
+        } else {
+            currency = AppCurrency.current
+        }
+
+        // ── 2. Localise category names ────────────────────────────────────
+        let langCode = CategoryLocalization.defaultSpeechCode()
+        func loc(_ key: String) -> String {
+            CategoryLocalization.name(for: key, langCode: langCode)
+        }
+
+        // ── 3. Pick budget amounts for the detected currency ──────────────
+        let budgets = CategoryLocalization.defaultBudgets(for: currency)
+        // budgets order: Food, Transport, Shopping, Bills, Health, Entertainment, Other
+
+        return [
+            Category(name: loc("Food"),          icon: "fork.knife",           budget: budgets[0], spent: 0, colorHex: "E07A5F"),
+            Category(name: loc("Transport"),     icon: "car.fill",             budget: budgets[1], spent: 0, colorHex: "5B8DB8"),
+            Category(name: loc("Shopping"),      icon: "bag.fill",             budget: budgets[2], spent: 0, colorHex: "9B84D0"),
+            Category(name: loc("Bills"),         icon: "bolt.fill",            budget: budgets[3], spent: 0, colorHex: "D4A853"),
+            Category(name: loc("Health"),        icon: "heart.fill",           budget: budgets[4], spent: 0, colorHex: "5BA88C"),
+            Category(name: loc("Entertainment"), icon: "popcorn.fill",         budget: budgets[5], spent: 0, colorHex: "C97BA8"),
+            Category(name: loc("Other"),         icon: "ellipsis.circle.fill", budget: budgets[6], spent: 0, colorHex: "8A95A8"),
         ]
     }
 
