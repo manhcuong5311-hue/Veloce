@@ -115,7 +115,7 @@ final class FinanceKitService {
     private static func isExpenseType(_ type: FinanceKit.TransactionType) -> Bool {
         switch type {
         case .pointOfSale, .atm, .billPayment, .fee, .withdrawal,
-             .standingOrder, .directDebit, .check, .transfer:
+             .standingOrder, .directDebit, .check:
             return true
         case .deposit, .directDeposit, .dividend, .interest,
              .refund, .adjustment, .loan, .unknown:
@@ -149,8 +149,10 @@ final class FinanceKitService {
             }
         }
 
-        // 3. Fallback → last category (usually "Other")
-        return categories.last?.id ?? categories[0].id
+        // 3. Fallback → "Other" category by name, then last resort
+        return findCategory(byKey: "Other", in: categories)
+            ?? categories.last?.id
+            ?? categories[0].id
     }
 
     /// Finds a category by its English system key ("Food", "Transport", …)
@@ -213,8 +215,8 @@ final class FinanceKitService {
         // ── TRANSPORT ─────────────────────────────────────────────────────────
         ([
             // Global brands / generic EN
-            "grab", "uber", "lyft", "taxi", "bus", "mrt", "train", "metro",
-            "subway", "parking", "petrol", "fuel", "toll", "ferry", "tram",
+            "grab", "uber", "lyft", "taxi", "bus ", "mrt", "train", "metro",
+            "parking", "petrol", "fuel", "toll", "ferry", "tram",
             "bolt", "gojek", "transit", "bts", "skytrain", "sky train",
             "rideshare", "car hire", "car rental", "airport", "airline",
             "flight", "highway", "expressway",
@@ -250,7 +252,7 @@ final class FinanceKitService {
             // Global brands / generic EN
             "shopee", "lazada", "amazon", "walmart", "target", "ebay", "etsy",
             "ikea", "zara", "h&m", "uniqlo", "primark", "costco", "sephora",
-            "mall", "shopping", "boutique", "clothing", "fashion", "apparel",
+            "mediamarkt", "mall", "shopping", "boutique", "clothing", "fashion", "apparel",
             "footwear", "sneaker", "jewellery", "jewelry", "electronics",
             "appliance", "hardware store", "department store",
             // VI
@@ -276,7 +278,7 @@ final class FinanceKitService {
             "เซ็นทรัล", "สยาม", "เทสโก้",
             // DE
             "kaufhaus", "drogerie", "kleidung", "mode", "rewe", "saturn",
-            "mediamarkt", "baumarkt", "dm-", "rossmann", "douglas",
+            "baumarkt", "dm-", "rossmann", "douglas",
         ], "Shopping"),
 
         // ── BILLS ─────────────────────────────────────────────────────────────
@@ -316,8 +318,8 @@ final class FinanceKitService {
         ([
             // Global / generic EN
             "hospital", "clinic", "pharmacy", "pharmacist", "doctor", "dental",
-            "dentist", "drugstore", "medical", "health", "physio", "optician",
-            "optometrist", "vet", "veterinary", "cvs", "walgreens", "boots",
+            "dentist", "drugstore", "medical", "health", "physio", "physiotherapy",
+            "optician", "optometrist", "vet", "veterinary", "cvs", "walgreens", "boots",
             "chemist", "gp visit", "specialist", "radiology", "laboratory",
             // VI
             "thuốc", "bệnh viện", "phòng khám", "bác sĩ", "nha khoa",
@@ -342,7 +344,7 @@ final class FinanceKitService {
             "ยา", "สุขภาพ", "บูทส์", "วัคซีน",
             // DE
             "apotheke", "arzt", "krankenhaus", "zahnarzt", "gesundheit",
-            "medikament", "dm drogerie", "rossmann", "optiker", "physio",
+            "medikament", "dm drogerie", "rossmann", "optiker", "physiotherapie",
         ], "Health"),
 
         // ── ENTERTAINMENT ─────────────────────────────────────────────────────

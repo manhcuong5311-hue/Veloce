@@ -356,10 +356,7 @@ enum VeloceTheme {
     static let textSecondary = Color(hex: "8A8680")
     static let textTertiary  = Color(hex: "C2BEB8")
 
-    // Accent — reads from UserDefaults so AccentColorPickerSheet takes effect on next launch
-    static var accent: Color {
-        Color(hex: UserDefaults.standard.string(forKey: "veloce_accent_hex") ?? "7B6CF0")
-    }
+    static let accent = Color(hex: "7B6CF0")
     static var accentBg: Color { accent.opacity(0.12) }
 
     // Status (muted)

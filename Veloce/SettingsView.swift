@@ -25,7 +25,6 @@ struct SettingsView: View {
     @State private var showImportSuccess    = false
     @State private var showEditSalary         = false
     @State private var showEditSaving         = false
-    @State private var showAccentColorPicker   = false
     @State private var showBudgetResetDay      = false
     @State private var showReminderTimePicker  = false
     @State private var showRecurring           = false
@@ -116,9 +115,6 @@ struct SettingsView: View {
                 initial: vm.savingGoal,
                 hint:    "settings_saving_hint"
             ) { vm.savingGoal = $0 }
-        }
-        .sheet(isPresented: $showAccentColorPicker) {
-            AccentColorPickerSheet()
         }
         .sheet(isPresented: $showBudgetResetDay) {
             BudgetResetDaySheet()
@@ -354,15 +350,6 @@ struct SettingsView: View {
             }
 
             // Premium-locked features — always tappable, paywall shown for free users
-            premiumLockedRow(
-                icon: "paintpalette.fill",
-                iconColor: Color(hex: "C97BA8"),
-                title: "settings_custom_accent",
-                subtitle: "settings_custom_accent_desc"
-            ) {
-                if subManager.isProUser { showAccentColorPicker = true }
-                else { showPaywall = true }
-            }
             premiumLockedRow(
                 icon: "calendar.badge.clock",
                 iconColor: Color(hex: "5B8DB8"),
@@ -1247,170 +1234,6 @@ struct ReminderTimePickerSheet: View {
     }
 }
 
-// MARK: - Accent Color Picker Sheet
-
-struct ColorItem {
-    let hex: String
-    let nameKey: String
-}
-
-
-
-struct AccentColorPickerSheet: View {
-    @Environment(\.dismiss) private var dismiss
-    @AppStorage("veloce_accent_hex") private var savedHex: String = "7B6CF0"
-    @State private var selected: String = "7B6CF0"
-
-    private let palette: [ColorItem] = [
-        .init(hex: "7B6CF0", nameKey: "color.indigo"),
-        .init(hex: "5B8DB8", nameKey: "color.blue"),
-        .init(hex: "4B9FA8", nameKey: "color.cyan"),
-        .init(hex: "5BA88C", nameKey: "color.teal"),
-        .init(hex: "6BBF8E", nameKey: "color.sage"),
-        .init(hex: "3DAF77", nameKey: "color.forest"),
-        .init(hex: "86C93A", nameKey: "color.lime"),
-        .init(hex: "D4A853", nameKey: "color.amber"),
-        .init(hex: "E8945A", nameKey: "color.orange"),
-        .init(hex: "E07A5F", nameKey: "color.coral"),
-        .init(hex: "E84545", nameKey: "color.red"),
-        .init(hex: "E86B8B", nameKey: "color.rose"),
-        .init(hex: "C97BA8", nameKey: "color.mauve"),
-        .init(hex: "9B84D0", nameKey: "color.lavender"),
-        .init(hex: "B44FE0", nameKey: "color.purple"),
-        .init(hex: "7B3CC4", nameKey: "color.violet"),
-        .init(hex: "5A7A9A", nameKey: "color.navy"),
-        .init(hex: "8A95A8", nameKey: "color.slate"),
-        .init(hex: "6C7B63", nameKey: "color.olive"),
-        .init(hex: "1C1B1A", nameKey: "color.graphite")
-    ]
-
-    var body: some View {
-        NavigationStack {
-            ZStack {
-                VeloceTheme.bg.ignoresSafeArea()
-                ScrollView(showsIndicators: false) {
-                    VStack(spacing: 24) {
-                        // Preview card
-                        VStack(spacing: 12) {
-                            ZStack {
-                                RoundedRectangle(cornerRadius: 20, style: .continuous)
-                                    .fill(Color(hex: selected).opacity(0.12))
-                                    .frame(height: 90)
-                                HStack(spacing: 12) {
-                                    Circle().fill(Color(hex: selected)).frame(width: 36, height: 36)
-                                    VStack(alignment: .leading, spacing: 4) {
-                                        Capsule().fill(Color(hex: selected)).frame(width: 100, height: 10)
-                                        Capsule().fill(Color(hex: selected).opacity(0.3)).frame(width: 70, height: 8)
-                                    }
-                                    Spacer()
-                                    Capsule()
-                                        .fill(Color(hex: selected))
-                                        .frame(width: 60, height: 32)
-                                        .overlay(
-                                            Text(String(localized: "common.save"))
-                                                .font(.system(size: 12, weight: .semibold))
-                                                .foregroundStyle(.white)
-                                        )
-                                }
-                                .padding(.horizontal, 20)
-                            }
-                            Text(String(localized: "settings.accent.preview"))
-                                .font(.system(size: 12))
-                                .foregroundStyle(VeloceTheme.textTertiary)
-                        }
-                        .padding(.horizontal, 20)
-                        .animation(.spring(response: 0.3), value: selected)
-
-                        // Color grid
-                        VStack(alignment: .leading, spacing: 14) {
-                            Text(String(localized: "settings.accent.choose"))
-                                .font(.system(size: 13, weight: .semibold))
-                                .foregroundStyle(VeloceTheme.textSecondary)
-
-                            LazyVGrid(
-                                columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 5),
-                                spacing: 10
-                            ) {
-                                ForEach(palette, id: \.hex) { item in
-                                    let isSelected = selected.uppercased() == item.hex.uppercased()
-                                    Button {
-                                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                                        withAnimation(.spring(response: 0.25)) { selected = item.hex }
-                                    } label: {
-                                        VStack(spacing: 6) {
-                                            ZStack {
-                                                Circle()
-                                                    .fill(Color(hex: item.hex))
-                                                    .frame(width: 44, height: 44)
-                                                    .overlay(
-                                                        Circle()
-                                                            .strokeBorder(.white, lineWidth: isSelected ? 3 : 0)
-                                                    )
-                                                    .shadow(color: Color(hex: item.hex).opacity(0.45),
-                                                            radius: isSelected ? 8 : 0, y: 3)
-                                                if isSelected {
-                                                    Image(systemName: "checkmark")
-                                                        .font(.system(size: 12, weight: .bold))
-                                                        .foregroundStyle(.white)
-                                                }
-                                            }
-                                            Text(LocalizedStringKey(item.nameKey))
-                                                .font(.system(size: 9, weight: isSelected ? .semibold : .regular))
-                                                .foregroundStyle(isSelected ? Color(hex: item.hex) : VeloceTheme.textTertiary)
-                                                .lineLimit(1)
-                                        }
-                                    }
-                                    .buttonStyle(.plain)
-                                    .animation(.spring(response: 0.2), value: isSelected)
-                                }
-                            }
-                        }
-                        .veloceCard()
-                        .padding(.horizontal, 20)
-
-                        // Save button
-                        Button {
-                            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                            savedHex = selected
-                            dismiss()
-                        } label: {
-                            Text(String(localized: "settings.accent.apply"))
-                                .font(.system(size: 16, weight: .semibold))
-                                .foregroundStyle(.white)
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 16)
-                                .background(
-                                    RoundedRectangle(cornerRadius: 16, style: .continuous)
-                                        .fill(Color(hex: selected))
-                                )
-                        }
-                        .padding(.horizontal, 20)
-                        .animation(.spring(response: 0.25), value: selected)
-
-                        Text(String(localized: "settings.accent.note"))
-                            .font(.system(size: 12))
-                            .foregroundStyle(VeloceTheme.textTertiary)
-                            .padding(.bottom, 8)
-                    }
-                    .padding(.top, 20)
-                }
-            }
-            .navigationTitle(String(localized: "settings.accent.title"))
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Button(String(localized:"common.cancel")) { dismiss() }
-                        .foregroundStyle(VeloceTheme.textSecondary)
-                }
-            }
-        }
-        .presentationDetents([.large])
-        .presentationDragIndicator(.visible)
-        .presentationBackground(VeloceTheme.bg)
-        .preferredColorScheme(.light)
-        .onAppear { selected = savedHex }
-    }
-}
 
 // MARK: - Budget Reset Day Sheet
 

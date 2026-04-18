@@ -150,8 +150,10 @@ struct CategoryColumnView: View, Equatable {
 
     // MARK: - Labels
 
+    @AppStorage("veloce_speech_language") private var speechLang: String = "en-US"
+
     private var nameLabel: some View {
-        Text(category.name)
+        Text(CategoryLocalization.name(for: category.name, langCode: speechLang))
             .font(.system(size: 11, weight: .medium))
             .foregroundStyle(VeloceTheme.textSecondary)
             .lineLimit(1)
