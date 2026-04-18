@@ -79,11 +79,11 @@ struct SettingsView: View {
                 .listStyle(.insetGrouped)
                 .scrollContentBackground(.hidden)
             }
-            .navigationTitle("Settings")
+            .navigationTitle(String(localized: "settings.title"))
             .navigationBarTitleDisplayMode(.large)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button("Done") { dismiss() }
+                    Button(String(localized:"common.done")) { dismiss() }
                         .fontWeight(.semibold)
                         .foregroundStyle(VeloceTheme.accent)
                 }
@@ -103,18 +103,18 @@ struct SettingsView: View {
         }
         .sheet(isPresented: $showEditSalary) {
             AmountEditSheet(
-                title:   "Monthly Salary",
+                title:   "settings_monthly_salary",
                 icon:    "banknote",
                 initial: vm.monthlyIncome,
-                hint:    "Your total income each month"
+                hint:    "settings_salary_hint"
             ) { vm.monthlyIncome = $0 }
         }
         .sheet(isPresented: $showEditSaving) {
             AmountEditSheet(
-                title:   "Saving Target",
+                title:   "settings_saving_target",
                 icon:    "target",
                 initial: vm.savingGoal,
-                hint:    "How much you aim to save monthly"
+                hint:    "settings_saving_hint"
             ) { vm.savingGoal = $0 }
         }
         .sheet(isPresented: $showAccentColorPicker) {
@@ -132,21 +132,21 @@ struct SettingsView: View {
             ReminderTimePickerSheet(notifMgr: notifMgr)
         }
         .confirmationDialog(
-            "Sign out of Veloce?",
+            String(localized: "settings_signout_confirm"),
             isPresented: $showSignOutConfirm,
             titleVisibility: .visible
         ) {
-            Button("Sign Out", role: .destructive) { authVM.signOut() }
+            Button(String(localized: "settings_sign_out"), role: .destructive) { authVM.signOut() }
         }
-        .alert("Import Failed", isPresented: $showImportError) {
+        .alert(String(localized: "settings_import_failed"), isPresented: $showImportError) {
             Button("OK", role: .cancel) {}
         } message: {
-            Text(importError ?? "The file could not be read.")
+            Text(importError ?? String(localized: "settings_import_error_generic"))
         }
-        .alert("Import Successful", isPresented: $showImportSuccess) {
+        .alert(String(localized: "settings_import_success"), isPresented: $showImportSuccess) {
             Button("OK", role: .cancel) {}
         } message: {
-            Text("Your data has been restored successfully.")
+            Text("settings_import_success_msg")
         }
         .preferredColorScheme(.light)
     }
@@ -159,7 +159,7 @@ struct SettingsView: View {
             Button { showEditSalary = true } label: {
                 HStack {
                     Label {
-                        Text("Monthly Salary")
+                        Text("settings_monthly_salary")
                             .foregroundStyle(VeloceTheme.textPrimary)
                     } icon: {
                         Image(systemName: "banknote")
@@ -172,7 +172,7 @@ struct SettingsView: View {
                                 .font(.system(size: 14, weight: .semibold, design: .rounded))
                                 .foregroundStyle(VeloceTheme.accent)
                         } else {
-                            Text("Not set")
+                            Text("settings_not_set")
                                 .font(.system(size: 14))
                                 .foregroundStyle(VeloceTheme.textTertiary)
                         }
@@ -187,7 +187,7 @@ struct SettingsView: View {
             Button { showEditSaving = true } label: {
                 HStack {
                     Label {
-                        Text("Saving Target")
+                        Text("settings_saving_target")
                             .foregroundStyle(VeloceTheme.textPrimary)
                     } icon: {
                         Image(systemName: "target")
@@ -200,7 +200,7 @@ struct SettingsView: View {
                                 .font(.system(size: 14, weight: .semibold, design: .rounded))
                                 .foregroundStyle(VeloceTheme.ok)
                         } else {
-                            Text("Not set")
+                            Text("settings_not_set")
                                 .font(.system(size: 14))
                                 .foregroundStyle(VeloceTheme.textTertiary)
                         }
@@ -221,7 +221,7 @@ struct SettingsView: View {
                         .font(.system(size: 13))
                         .foregroundStyle(isSaving ? VeloceTheme.ok : VeloceTheme.over)
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(isSaving ? "Projected savings" : "Over budget by")
+                        Text(String(localized: isSaving ? "settings_projected_savings" : "settings_over_budget"))
                             .font(.system(size: 12))
                             .foregroundStyle(VeloceTheme.textSecondary)
                         Text("\(isSaving ? "" : "-")\(abs(savings).toCompactCurrency())  (\(String(format: "%.0f", savingsPct))%)")
@@ -256,7 +256,7 @@ struct SettingsView: View {
                 )
             }
         } header: {
-            sectionHeader("General", icon: "slider.horizontal.3")
+            sectionHeader("settings_general", icon: "slider.horizontal.3")
         } footer: {
             Text("settings_general_footer")
                 .font(.system(size: 12))
@@ -277,7 +277,7 @@ struct SettingsView: View {
                             .foregroundStyle(VeloceTheme.accent)
                     }
                     VStack(alignment: .leading, spacing: 3) {
-                        Text(user.displayName ?? "Veloce User")
+                        Text(user.displayName ?? String(localized: "settings_veloce_user"))
                             .font(.system(size: 15, weight: .semibold))
                             .foregroundStyle(VeloceTheme.textPrimary)
                         Text(user.email ?? user.uid)
@@ -288,7 +288,7 @@ struct SettingsView: View {
                     }
                     Spacer()
                     if subManager.isProUser {
-                        Text("PRO")
+                        Text(String(localized: "pro.badge"))
                             .font(.system(size: 9, weight: .black))
                             .foregroundStyle(.white)
                             .padding(.horizontal, 8)
@@ -299,10 +299,10 @@ struct SettingsView: View {
                 .padding(.vertical, 4)
             }
             Button(role: .destructive) { showSignOutConfirm = true } label: {
-                Label("Sign Out", systemImage: "rectangle.portrait.and.arrow.right")
+                Label("settings_sign_out", systemImage: "rectangle.portrait.and.arrow.right")
             }
         } header: {
-            sectionHeader("Account", icon: "person.circle")
+            sectionHeader("settings_account", icon: "person.circle")
         }
     }
 
@@ -313,7 +313,7 @@ struct SettingsView: View {
             if subManager.isProUser {
                 HStack {
                     Label {
-                        Text("Premium — Active")
+                        Text("settings_premium_active")
                             .foregroundStyle(VeloceTheme.ok)
                             .font(.system(size: 15, weight: .medium))
                     } icon: {
@@ -321,7 +321,7 @@ struct SettingsView: View {
                             .foregroundStyle(VeloceTheme.ok)
                     }
                     Spacer()
-                    Text("50 AI / day")
+                    Text("settings_pro_ai_limit")
                         .font(.system(size: 12))
                         .foregroundStyle(VeloceTheme.textTertiary)
                 }
@@ -329,7 +329,7 @@ struct SettingsView: View {
                 Button { showPaywall = true } label: {
                     HStack {
                         Label {
-                            Text("Upgrade to Premium")
+                            Text("settings_upgrade_premium")
                                 .font(.system(size: 15, weight: .semibold))
                                 .foregroundStyle(VeloceTheme.accent)
                         } icon: {
@@ -337,7 +337,7 @@ struct SettingsView: View {
                                 .foregroundStyle(VeloceTheme.accent)
                         }
                         Spacer()
-                        Text("3 AI / day  ·  Free")
+                        Text("settings_free_ai_limit")
                             .font(.system(size: 12))
                             .foregroundStyle(VeloceTheme.textTertiary)
                         Image(systemName: "chevron.right")
@@ -348,7 +348,7 @@ struct SettingsView: View {
             }
 
             Button { Task { await subManager.restorePurchases() } } label: {
-                Label("Restore Purchases", systemImage: "arrow.clockwise")
+                Label("settings_restore_purchases", systemImage: "arrow.clockwise")
                     .foregroundStyle(VeloceTheme.textSecondary)
                     .font(.system(size: 14))
             }
@@ -357,8 +357,8 @@ struct SettingsView: View {
             premiumLockedRow(
                 icon: "paintpalette.fill",
                 iconColor: Color(hex: "C97BA8"),
-                title: "Custom Accent Color",
-                subtitle: "Personalize your app theme"
+                title: "settings_custom_accent",
+                subtitle: "settings_custom_accent_desc"
             ) {
                 if subManager.isProUser { showAccentColorPicker = true }
                 else { showPaywall = true }
@@ -366,8 +366,8 @@ struct SettingsView: View {
             premiumLockedRow(
                 icon: "calendar.badge.clock",
                 iconColor: Color(hex: "5B8DB8"),
-                title: "Budget Reset Day",
-                subtitle: "Choose your monthly cycle start"
+                title: "settings_budget_reset_day",
+                subtitle: "settings_budget_reset_day_desc"
             ) {
                 if subManager.isProUser { showBudgetResetDay = true }
                 else { showPaywall = true }
@@ -375,15 +375,15 @@ struct SettingsView: View {
             premiumLockedRow(
                 icon: "arrow.clockwise.circle.fill",
                 iconColor: Color(hex: "7EC8A4"),
-                title: "Recurring Transactions",
-                subtitle: "Auto-log rent, subscriptions & bills"
+                title: "settings_recurring",
+                subtitle: "settings_recurring_desc"
             ) {
                 if subManager.isProUser { showRecurring = true }
                 else { showPaywall = true }
             }
 
         } header: {
-            sectionHeader("Premium", icon: "star.circle.fill")
+            sectionHeader("settings_premium", icon: "star.circle.fill")
         } footer: {
             if !subManager.isProUser {
                 Text("settings_premium_footer")
@@ -421,7 +421,8 @@ struct SettingsView: View {
                 } else {
                     HStack(spacing: 3) {
                         Image(systemName: "lock.fill").font(.system(size: 9))
-                        Text("Pro").font(.system(size: 11, weight: .bold))
+                        Text(String(localized: "pro.title"))
+                            .font(.system(size: 11, weight: .bold))
                     }
                     .foregroundStyle(VeloceTheme.accent)
                     .padding(.horizontal, 8)
@@ -438,7 +439,7 @@ struct SettingsView: View {
         Section {
             Toggle(isOn: $aiSuggestionsEnabled) {
                 Label {
-                    Text("AI Suggestions")
+                    Text("settings_ai_suggestions")
                         .foregroundStyle(VeloceTheme.textPrimary)
                 } icon: {
                     Image(systemName: "brain.head.profile")
@@ -453,7 +454,7 @@ struct SettingsView: View {
                 }
             } label: {
                 Label {
-                    Text("Currency")
+                    Text("settings_currency")
                         .foregroundStyle(VeloceTheme.textPrimary)
                 } icon: {
                     Image(systemName: "dollarsign.circle")
@@ -468,7 +469,7 @@ struct SettingsView: View {
                 }
             } label: {
                 Label {
-                    Text("Voice Language")
+                    Text("settings_voice_language")
                         .foregroundStyle(VeloceTheme.textPrimary)
                 } icon: {
                     Image(systemName: "mic.circle")
@@ -477,7 +478,7 @@ struct SettingsView: View {
             }
             .tint(VeloceTheme.accent)
         } header: {
-            sectionHeader("Preferences", icon: "gearshape")
+            sectionHeader("settings_preferences", icon: "gearshape")
         }
     }
 
@@ -492,10 +493,10 @@ struct SettingsView: View {
                         Image(systemName: "bell.slash.fill")
                             .foregroundStyle(VeloceTheme.over)
                         VStack(alignment: .leading, spacing: 2) {
-                            Text("Notifications disabled")
+                            Text("settings_notif_disabled")
                                 .font(.system(size: 14, weight: .medium))
                                 .foregroundStyle(VeloceTheme.textPrimary)
-                            Text("Tap to open System Settings")
+                            Text("settings_tap_system_settings")
                                 .font(.system(size: 12))
                                 .foregroundStyle(VeloceTheme.textSecondary)
                         }
@@ -511,7 +512,7 @@ struct SettingsView: View {
             // Daily Reminder toggle
             HStack {
                 Label {
-                    Text("Daily Reminder")
+                    Text("settings_daily_reminder")
                         .foregroundStyle(VeloceTheme.textPrimary)
                 } icon: {
                     Image(systemName: "bell.fill")
@@ -529,7 +530,7 @@ struct SettingsView: View {
             // Budget Alerts toggle
             HStack {
                 Label {
-                    Text("Budget Alerts")
+                    Text("settings_budget_alerts")
                         .foregroundStyle(VeloceTheme.textPrimary)
                 } icon: {
                     Image(systemName: "chart.bar.fill")
@@ -548,7 +549,7 @@ struct SettingsView: View {
             Button { showReminderTimePicker = true } label: {
                 HStack {
                     Label {
-                        Text("Reminder Time")
+                        Text("settings_reminder_time")
                             .foregroundStyle(VeloceTheme.textPrimary)
                     } icon: {
                         Image(systemName: "clock.fill")
@@ -573,7 +574,7 @@ struct SettingsView: View {
                         Text(String(format: String(localized: "streak_label_fmt"), notifMgr.dailyStreak))
                             .font(.system(size: 14, weight: .semibold))
                             .foregroundStyle(VeloceTheme.textPrimary)
-                        Text("Keep logging expenses daily to maintain it")
+                        Text("settings_streak_hint")
                             .font(.system(size: 12))
                             .foregroundStyle(VeloceTheme.textSecondary)
                     }
@@ -589,7 +590,7 @@ struct SettingsView: View {
             // Open System Settings link
             Button(action: { notifMgr.openSystemSettings() }) {
                 Label {
-                    Text("Open System Settings")
+                    Text("settings_open_system_settings")
                         .foregroundStyle(VeloceTheme.textPrimary)
                 } icon: {
                     Image(systemName: "gear")
@@ -598,7 +599,7 @@ struct SettingsView: View {
             }
 
         } header: {
-            sectionHeader("Notifications", icon: "bell.badge")
+            sectionHeader("settings_notifications", icon: "bell.badge")
         } footer: {
             switch notifMgr.authStatus {
             case .authorized:
@@ -622,7 +623,7 @@ struct SettingsView: View {
             // iCloud Sync toggle
             HStack {
                 Label {
-                    Text("iCloud Sync")
+                    Text("settings_icloud_sync")
                         .foregroundStyle(subManager.isProUser ? VeloceTheme.textPrimary : VeloceTheme.textTertiary)
                 } icon: {
                     Image(systemName: "icloud")
@@ -649,7 +650,7 @@ struct SettingsView: View {
             Button(action: handlePDFExport) {
                 HStack {
                     Label {
-                        Text("Month Report (PDF)")
+                        Text("settings_month_report")
                             .foregroundStyle(subManager.isProUser ? VeloceTheme.textPrimary : VeloceTheme.textTertiary)
                     } icon: {
                         Image(systemName: "doc.richtext")
@@ -664,7 +665,7 @@ struct SettingsView: View {
             Button(action: handleExport) {
                 HStack {
                     Label {
-                        Text("Export Data (JSON)")
+                        Text("settings_export_data")
                             .foregroundStyle(subManager.isProUser ? VeloceTheme.textPrimary : VeloceTheme.textTertiary)
                     } icon: {
                         Image(systemName: "square.and.arrow.up")
@@ -677,7 +678,7 @@ struct SettingsView: View {
             Button(action: handleImportTap) {
                 HStack {
                     Label {
-                        Text("Import Data (JSON)")
+                        Text("settings_import_data")
                             .foregroundStyle(subManager.isProUser ? VeloceTheme.textPrimary : VeloceTheme.textTertiary)
                     } icon: {
                         Image(systemName: "square.and.arrow.down")
@@ -688,13 +689,13 @@ struct SettingsView: View {
                 }
             }
         } header: {
-            sectionHeader("Data", icon: "externaldrive")
+            sectionHeader("settings_data", icon: "externaldrive")
         } footer: {
             Group {
                 if subManager.isProUser && iCloudSyncEnabled && !PersistenceStore.shared.isICloudAvailable {
-                    Text("iCloud is not available. Sign into iCloud in iOS Settings to enable sync.")
+                    Text("settings_icloud_unavailable")
                 } else {
-                    Text(subManager.isProUser ? "settings_data_pro_footer" : "settings_data_free_footer")
+                    Text(String(localized: subManager.isProUser ? "settings_data_pro_footer" : "settings_data_free_footer"))
                 }
             }
             .font(.system(size: 12))
@@ -705,7 +706,8 @@ struct SettingsView: View {
     private var lockBadge: some View {
         HStack(spacing: 3) {
             Image(systemName: "lock.fill").font(.system(size: 9))
-            Text("Pro").font(.system(size: 11, weight: .bold))
+            Text("pro.title")
+                .font(.system(size: 11, weight: .bold))
         }
         .foregroundStyle(VeloceTheme.accent)
         .padding(.horizontal, 8)
@@ -720,7 +722,7 @@ struct SettingsView: View {
             Link(destination: URL(string: "https://manhcuong5311-hue.github.io/Veloce/")!) {
                 HStack {
                     Label {
-                        Text("Privacy Policy")
+                        Text("settings_privacy_policy")
                             .foregroundStyle(VeloceTheme.textPrimary)
                     } icon: {
                         Image(systemName: "hand.raised.fill")
@@ -735,7 +737,7 @@ struct SettingsView: View {
             Link(destination: URL(string: "https://www.apple.com/legal/internet-services/itunes/dev/stdeula/")!) {
                 HStack {
                     Label {
-                        Text("Terms of Use (EULA)")
+                        Text("settings_terms_eula")
                             .foregroundStyle(VeloceTheme.textPrimary)
                     } icon: {
                         Image(systemName: "doc.text.fill")
@@ -748,7 +750,7 @@ struct SettingsView: View {
                 }
             }
         } header: {
-            sectionHeader("Legal", icon: "checkmark.shield")
+            sectionHeader("settings_legal", icon: "checkmark.shield")
         }
     }
 
@@ -769,10 +771,10 @@ struct SettingsView: View {
                             .foregroundStyle(VeloceTheme.accent)
                     }
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("FAQ & Help")
+                        Text("settings_faq_title")
                             .font(.system(size: 15, weight: .medium))
                             .foregroundStyle(VeloceTheme.textPrimary)
-                        Text("Common questions answered")
+                        Text("settings_faq_subtitle")
                             .font(.system(size: 12))
                             .foregroundStyle(VeloceTheme.textTertiary)
                     }
@@ -797,11 +799,11 @@ struct SettingsView: View {
                 }
             } label: {
                 HStack {
-                    Text("Version")
+                    Text("settings_version")
                         .foregroundStyle(VeloceTheme.textSecondary)
                     Spacer()
                     if versionTapCount >= 3 {
-                        Text("\(5 - versionTapCount) more…")
+                        Text("\(5 - versionTapCount) \(String(localized: "settings.taps_remaining"))")
                             .font(.system(size: 12))
                             .foregroundStyle(VeloceTheme.accent.opacity(0.7))
                             .transition(.opacity)
@@ -814,18 +816,18 @@ struct SettingsView: View {
             .buttonStyle(.plain)
         } footer: {
             if versionTapCount >= 3 {
-                Text("Keep tapping…")
+                Text("settings_keep_tapping")
                     .font(.system(size: 11))
                     .foregroundStyle(VeloceTheme.accent.opacity(0.6))
                     .transition(.opacity)
             }
         }
         // Developer action sheet — 2 options
-        .confirmationDialog("Developer Menu", isPresented: $showDevMenu, titleVisibility: .visible) {
-            Button("Open Onboarding") {
+        .confirmationDialog(String(localized: "settings_dev_menu"), isPresented: $showDevMenu, titleVisibility: .visible) {
+            Button(String(localized: "settings_open_onboarding")) {
                 showOnboarding = true
             }
-            Button("Test Notification") {
+            Button(String(localized: "settings_test_notification")) {
                 Task {
                     if notifMgr.authStatus != .authorized {
                         let granted = await notifMgr.requestPermission()
@@ -834,9 +836,9 @@ struct SettingsView: View {
                     notifMgr.sendTestNotification()
                 }
             }
-            Button("Cancel", role: .cancel) {}
+            Button(String(localized: "common.cancel"), role: .cancel) {}
         } message: {
-            Text("These options are for development only.")
+            Text("settings_dev_only")
         }
         .fullScreenCover(isPresented: $showOnboarding) {
             OnboardingView()
@@ -941,7 +943,8 @@ private struct AmountEditSheet: View {
 
                     // Amount input
                     VStack(spacing: 6) {
-                        Text("Amount")
+                        Text(String(localized: "expense.amount"))
+
                             .font(.system(size: 12, weight: .medium))
                             .foregroundStyle(VeloceTheme.textSecondary)
                             .tracking(0.3)
@@ -987,7 +990,7 @@ private struct AmountEditSheet: View {
                     .animation(.spring(response: 0.3), value: parsed != nil)
 
                     Button(action: save) {
-                        Text("Save")
+                        Text(String(localized: "common.save"))
                             .font(.system(size: 16, weight: .semibold))
                             .foregroundStyle(.white)
                             .frame(maxWidth: .infinity)
@@ -1008,7 +1011,9 @@ private struct AmountEditSheet: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    Button("Cancel") { dismiss() }
+                    Button(String(localized: "common.cancel")) {
+                        dismiss()
+                    }
                         .foregroundStyle(VeloceTheme.textSecondary)
                 }
             }
@@ -1035,47 +1040,24 @@ private struct AmountEditSheet: View {
 }
 
 // MARK: - FAQ View
+struct FAQItem {
+    let questionKey: String
+    let answerKey: String
+}
 
 struct FAQView: View {
     @State private var expanded: Set<String> = []
 
-    private let items: [(q: String, a: String)] = [
-        (
-            "How do I add an expense?",
-            "Tap the mic or text bar at the bottom and type (or say) something like \"coffee 45k\" or \"lunch 120k\". Veloce parses the amount and assigns a category automatically."
-        ),
-        (
-            "How do I edit or delete a transaction?",
-            "Tap any row in the list to open the edit screen. Long-press (hold) a row to reveal a quick-action menu with Edit and Delete options."
-        ),
-        (
-            "How do I set or change a budget?",
-            "On the Spending card, tap \"Edit Budget\" to drag the bars and redistribute your allocation in real time. For precise values, tap \"Groups\" → pencil icon."
-        ),
-        (
-            "How do I change my salary or saving target?",
-            "Go to Settings → General. Tap Monthly Salary or Saving Target to edit the value in a full-screen input."
-        ),
-        (
-            "What does the AI Assistant do?",
-            "The AI reads your spending and budget to give personalised advice. Ask it anything — \"Where am I overspending?\", \"How can I save 2M this month?\", or \"Analyse my portfolio\"."
-        ),
-        (
-            "How do I customise a category?",
-            "Tap \"Groups\" on the Spending card, then the pencil icon next to any category. Premium members can change its icon and color."
-        ),
-        (
-            "What's included in Premium?",
-            "Premium gives you 50 AI messages/day, custom icon & color, custom accent color, budget reset day, and JSON export/import. Free plan includes 3 AI messages/day."
-        ),
-        (
-            "How do I change the currency?",
-            "Go to Settings → Preferences → Currency and pick your currency. All amounts update immediately."
-        ),
-        (
-            "Is my data backed up?",
-            "Data is stored locally and synced to Firebase when signed in. Use Export Data (Premium) for an additional backup."
-        ),
+    private let items: [FAQItem] = [
+        FAQItem(questionKey: "faq.add_expense.q", answerKey: "faq.add_expense.a"),
+        FAQItem(questionKey: "faq.edit_transaction.q", answerKey: "faq.edit_transaction.a"),
+        FAQItem(questionKey: "faq.budget.q", answerKey: "faq.budget.a"),
+        FAQItem(questionKey: "faq.salary.q", answerKey: "faq.salary.a"),
+        FAQItem(questionKey: "faq.ai.q", answerKey: "faq.ai.a"),
+        FAQItem(questionKey: "faq.category.q", answerKey: "faq.category.a"),
+        FAQItem(questionKey: "faq.premium.q", answerKey: "faq.premium.a"),
+        FAQItem(questionKey: "faq.currency.q", answerKey: "faq.currency.a"),
+        FAQItem(questionKey: "faq.backup.q", answerKey: "faq.backup.a")
     ]
 
     var body: some View {
@@ -1083,34 +1065,36 @@ struct FAQView: View {
             VeloceTheme.bg.ignoresSafeArea()
             List {
                 Section {
-                    ForEach(items, id: \.q) { item in
+                    ForEach(items, id: \.questionKey) { item in
                         DisclosureGroup(
                             isExpanded: Binding(
-                                get: { expanded.contains(item.q) },
+                                get: { expanded.contains(item.questionKey) },
                                 set: { open in
                                     withAnimation(.spring(response: 0.32, dampingFraction: 0.78)) {
-                                        if open { expanded.insert(item.q) } else { expanded.remove(item.q) }
+                                        if open {
+                                            expanded.insert(item.questionKey)
+                                        } else {
+                                            expanded.remove(item.questionKey)
+                                        }
                                     }
                                 }
                             )
                         ) {
-                            Text(item.a)
+                            Text(LocalizedStringKey(item.answerKey))
                                 .font(.system(size: 13))
                                 .foregroundStyle(VeloceTheme.textSecondary)
                                 .fixedSize(horizontal: false, vertical: true)
                                 .padding(.top, 6)
                                 .padding(.bottom, 4)
                         } label: {
-                            Text(item.q)
+                            Text(LocalizedStringKey(item.questionKey))
                                 .font(.system(size: 14, weight: .medium))
                                 .foregroundStyle(VeloceTheme.textPrimary)
                                 .fixedSize(horizontal: false, vertical: true)
                         }
-                        .tint(VeloceTheme.accent)
-                        .listRowBackground(VeloceTheme.surface)
                     }
                 } header: {
-                    Text("Tap a question to expand the answer.")
+                    Text(String(localized: "faq.hint"))
                         .font(.system(size: 12))
                         .foregroundStyle(VeloceTheme.textTertiary)
                         .textCase(nil)
@@ -1119,7 +1103,7 @@ struct FAQView: View {
             .listStyle(.insetGrouped)
             .scrollContentBackground(.hidden)
         }
-        .navigationTitle("FAQ & Help")
+        .navigationTitle(String(localized: "faq.title"))
         .navigationBarTitleDisplayMode(.large)
         .preferredColorScheme(.light)
     }
@@ -1189,10 +1173,10 @@ struct ReminderTimePickerSheet: View {
                                 .font(.system(size: 28, weight: .medium))
                                 .foregroundStyle(VeloceTheme.accent)
                         }
-                        Text("Daily Reminder Time")
+                        Text("settings_reminder_title")
                             .font(.system(size: 17, weight: .semibold))
                             .foregroundStyle(VeloceTheme.textPrimary)
-                        Text("Choose when Veloce should remind you\nto log today's expenses.")
+                        Text("settings_reminder_desc")
                             .font(.system(size: 13))
                             .foregroundStyle(VeloceTheme.textSecondary)
                             .multilineTextAlignment(.center)
@@ -1211,14 +1195,14 @@ struct ReminderTimePickerSheet: View {
                     HStack(spacing: 6) {
                         Image(systemName: "info.circle")
                             .font(.system(size: 11))
-                        Text("A ±15 minute variation is applied to feel more natural.")
+                        Text("settings_reminder_note")
                             .font(.system(size: 12))
                     }
                     .foregroundStyle(VeloceTheme.textTertiary)
 
                     // Save button
                     Button(action: save) {
-                        Text("Save")
+                        Text(String(localized: "common.save"))
                             .font(.system(size: 16, weight: .semibold))
                             .foregroundStyle(.white)
                             .frame(maxWidth: .infinity)
@@ -1233,11 +1217,11 @@ struct ReminderTimePickerSheet: View {
                 }
                 .padding(20)
             }
-            .navigationTitle("Reminder Time")
+            .navigationTitle(String(localized: "reminder.time.title"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    Button("Cancel") { dismiss() }
+                    Button(String(localized:"common.cancel")) { dismiss() }
                         .foregroundStyle(VeloceTheme.textSecondary)
                 }
             }
@@ -1265,16 +1249,39 @@ struct ReminderTimePickerSheet: View {
 
 // MARK: - Accent Color Picker Sheet
 
+struct ColorItem {
+    let hex: String
+    let nameKey: String
+}
+
+
+
 struct AccentColorPickerSheet: View {
     @Environment(\.dismiss) private var dismiss
     @AppStorage("veloce_accent_hex") private var savedHex: String = "7B6CF0"
     @State private var selected: String = "7B6CF0"
 
-    private let palette: [(hex: String, name: String)] = [
-        ("7B6CF0", "Indigo"),   ("5B8DB8", "Blue"),    ("4B9FA8", "Cyan"),    ("5BA88C", "Teal"),    ("6BBF8E", "Sage"),
-        ("3DAF77", "Forest"),   ("86C93A", "Lime"),    ("D4A853", "Amber"),   ("E8945A", "Orange"),  ("E07A5F", "Coral"),
-        ("E84545", "Red"),      ("E86B8B", "Rose"),    ("C97BA8", "Mauve"),   ("9B84D0", "Lavender"),("B44FE0", "Purple"),
-        ("7B3CC4", "Violet"),   ("5A7A9A", "Navy"),    ("8A95A8", "Slate"),   ("6C7B63", "Olive"),   ("1C1B1A", "Graphite"),
+    private let palette: [ColorItem] = [
+        .init(hex: "7B6CF0", nameKey: "color.indigo"),
+        .init(hex: "5B8DB8", nameKey: "color.blue"),
+        .init(hex: "4B9FA8", nameKey: "color.cyan"),
+        .init(hex: "5BA88C", nameKey: "color.teal"),
+        .init(hex: "6BBF8E", nameKey: "color.sage"),
+        .init(hex: "3DAF77", nameKey: "color.forest"),
+        .init(hex: "86C93A", nameKey: "color.lime"),
+        .init(hex: "D4A853", nameKey: "color.amber"),
+        .init(hex: "E8945A", nameKey: "color.orange"),
+        .init(hex: "E07A5F", nameKey: "color.coral"),
+        .init(hex: "E84545", nameKey: "color.red"),
+        .init(hex: "E86B8B", nameKey: "color.rose"),
+        .init(hex: "C97BA8", nameKey: "color.mauve"),
+        .init(hex: "9B84D0", nameKey: "color.lavender"),
+        .init(hex: "B44FE0", nameKey: "color.purple"),
+        .init(hex: "7B3CC4", nameKey: "color.violet"),
+        .init(hex: "5A7A9A", nameKey: "color.navy"),
+        .init(hex: "8A95A8", nameKey: "color.slate"),
+        .init(hex: "6C7B63", nameKey: "color.olive"),
+        .init(hex: "1C1B1A", nameKey: "color.graphite")
     ]
 
     var body: some View {
@@ -1300,14 +1307,14 @@ struct AccentColorPickerSheet: View {
                                         .fill(Color(hex: selected))
                                         .frame(width: 60, height: 32)
                                         .overlay(
-                                            Text("Save")
+                                            Text(String(localized: "common.save"))
                                                 .font(.system(size: 12, weight: .semibold))
                                                 .foregroundStyle(.white)
                                         )
                                 }
                                 .padding(.horizontal, 20)
                             }
-                            Text("Preview")
+                            Text(String(localized: "settings.accent.preview"))
                                 .font(.system(size: 12))
                                 .foregroundStyle(VeloceTheme.textTertiary)
                         }
@@ -1316,7 +1323,7 @@ struct AccentColorPickerSheet: View {
 
                         // Color grid
                         VStack(alignment: .leading, spacing: 14) {
-                            Text("Choose a color")
+                            Text(String(localized: "settings.accent.choose"))
                                 .font(.system(size: 13, weight: .semibold))
                                 .foregroundStyle(VeloceTheme.textSecondary)
 
@@ -1347,7 +1354,7 @@ struct AccentColorPickerSheet: View {
                                                         .foregroundStyle(.white)
                                                 }
                                             }
-                                            Text(item.name)
+                                            Text(LocalizedStringKey(item.nameKey))
                                                 .font(.system(size: 9, weight: isSelected ? .semibold : .regular))
                                                 .foregroundStyle(isSelected ? Color(hex: item.hex) : VeloceTheme.textTertiary)
                                                 .lineLimit(1)
@@ -1367,7 +1374,7 @@ struct AccentColorPickerSheet: View {
                             savedHex = selected
                             dismiss()
                         } label: {
-                            Text("Apply Color")
+                            Text(String(localized: "settings.accent.apply"))
                                 .font(.system(size: 16, weight: .semibold))
                                 .foregroundStyle(.white)
                                 .frame(maxWidth: .infinity)
@@ -1380,7 +1387,7 @@ struct AccentColorPickerSheet: View {
                         .padding(.horizontal, 20)
                         .animation(.spring(response: 0.25), value: selected)
 
-                        Text("Color applies on next app launch.")
+                        Text(String(localized: "settings.accent.note"))
                             .font(.system(size: 12))
                             .foregroundStyle(VeloceTheme.textTertiary)
                             .padding(.bottom, 8)
@@ -1388,11 +1395,11 @@ struct AccentColorPickerSheet: View {
                     .padding(.top, 20)
                 }
             }
-            .navigationTitle("Accent Color")
+            .navigationTitle(String(localized: "settings.accent.title"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    Button("Cancel") { dismiss() }
+                    Button(String(localized:"common.cancel")) { dismiss() }
                         .foregroundStyle(VeloceTheme.textSecondary)
                 }
             }
@@ -1431,7 +1438,7 @@ struct BudgetResetDaySheet: View {
                                     .foregroundStyle(VeloceTheme.accent)
                             }
                             VStack(alignment: .leading, spacing: 4) {
-                                Text("Budget resets on the")
+                                Text("settings_reset_prefix")
                                     .font(.system(size: 13))
                                     .foregroundStyle(VeloceTheme.textSecondary)
                                 HStack(alignment: .lastTextBaseline, spacing: 4) {
@@ -1440,7 +1447,7 @@ struct BudgetResetDaySheet: View {
                                         .foregroundStyle(VeloceTheme.accent)
                                         .contentTransition(.numericText())
                                         .animation(.spring(response: 0.25), value: selectedDay)
-                                    Text("of each month")
+                                    Text("settings_reset_suffix")
                                         .font(.system(size: 13))
                                         .foregroundStyle(VeloceTheme.textSecondary)
                                 }
@@ -1452,7 +1459,7 @@ struct BudgetResetDaySheet: View {
 
                         // Day grid 1–28
                         VStack(alignment: .leading, spacing: 14) {
-                            Text("Select reset day")
+                            Text("settings_reset_select")
                                 .font(.system(size: 13, weight: .semibold))
                                 .foregroundStyle(VeloceTheme.textSecondary)
 
@@ -1478,7 +1485,7 @@ struct BudgetResetDaySheet: View {
                                 }
                             }
 
-                            Text("Days 29–31 are skipped for shorter months.")
+                            Text("settings_reset_note")
                                 .font(.system(size: 11))
                                 .foregroundStyle(VeloceTheme.textTertiary)
                         }
@@ -1490,7 +1497,7 @@ struct BudgetResetDaySheet: View {
                             resetDay = selectedDay
                             dismiss()
                         } label: {
-                            Text("Save Reset Day")
+                            Text("settings_reset_save")
                                 .font(.system(size: 16, weight: .semibold))
                                 .foregroundStyle(.white)
                                 .frame(maxWidth: .infinity)
@@ -1506,11 +1513,11 @@ struct BudgetResetDaySheet: View {
                     .padding(.top, 20)
                 }
             }
-            .navigationTitle("Budget Reset Day")
+            .navigationTitle(String(localized: "budget.reset.title"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    Button("Cancel") { dismiss() }
+                    Button(String(localized:"common.cancel")) { dismiss() }
                         .foregroundStyle(VeloceTheme.textSecondary)
                 }
             }

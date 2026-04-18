@@ -31,7 +31,7 @@ struct RecurringTransactionsView: View {
                                 }
                             }
                         } header: {
-                            Text("Auto-logged on their next due date")
+                            Text("recurring_auto_logged_hint")
                                 .font(.system(size: 11))
                                 .foregroundStyle(VeloceTheme.textTertiary)
                                 .textCase(nil)
@@ -41,11 +41,11 @@ struct RecurringTransactionsView: View {
                     .scrollContentBackground(.hidden)
                 }
             }
-            .navigationTitle("Recurring")
+            .navigationTitle(String(localized: "Recurring"))
             .navigationBarTitleDisplayMode(.large)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    Button("Done") { dismiss() }
+                    Button(String(localized: "common.done")) { dismiss() }
                         .font(.system(size: 15, weight: .semibold))
                         .foregroundStyle(VeloceTheme.accent)
                 }
@@ -82,10 +82,10 @@ struct RecurringTransactionsView: View {
                     .foregroundStyle(VeloceTheme.accent)
             }
             VStack(spacing: 6) {
-                Text("No Recurring Transactions")
+                Text("recurring_empty_title")
                     .font(.system(size: 17, weight: .semibold))
                     .foregroundStyle(VeloceTheme.textPrimary)
-                Text("Add rent, Netflix, gym — auto-logged every cycle.")
+                Text("recurring_empty_hint")
                     .font(.system(size: 13))
                     .foregroundStyle(VeloceTheme.textSecondary)
                     .multilineTextAlignment(.center)
@@ -94,7 +94,7 @@ struct RecurringTransactionsView: View {
                 HStack(spacing: 6) {
                     Image(systemName: "plus.circle.fill")
                         .font(.system(size: 14))
-                    Text("Add Recurring")
+                    Text("recurring_add_btn")
                         .font(.system(size: 15, weight: .semibold))
                 }
                 .foregroundStyle(.white)
@@ -212,7 +212,7 @@ struct AddRecurringSheet: View {
                     VStack(spacing: 16) {
                         // Amount hero
                         VStack(spacing: 6) {
-                            Text("Amount")
+                            Text("expense.amount")
                                 .font(.system(size: 12, weight: .medium))
                                 .foregroundStyle(VeloceTheme.textSecondary)
                             HStack(alignment: .lastTextBaseline, spacing: 4) {
@@ -249,7 +249,7 @@ struct AddRecurringSheet: View {
                         // Details
                         VStack(spacing: 0) {
                             formRow("Title") {
-                                TextField("e.g. Rent, Netflix, Gym", text: $title)
+                                TextField(String(localized: "recurring_title_placeholder"), text: $title)
                                     .font(.system(size: 15))
                                     .foregroundStyle(VeloceTheme.textPrimary)
                                     .multilineTextAlignment(.trailing)
@@ -280,7 +280,7 @@ struct AddRecurringSheet: View {
                         .veloceCard()
 
                         Button(action: save) {
-                            Text("Add Recurring")
+                            Text("recurring_add_btn")
                                 .font(.system(size: 16, weight: .semibold))
                                 .foregroundStyle(.white)
                                 .frame(maxWidth: .infinity)
@@ -297,11 +297,11 @@ struct AddRecurringSheet: View {
                     .padding(.bottom, 24)
                 }
             }
-            .navigationTitle("New Recurring")
+            .navigationTitle(String(localized: "recurring_new_title"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    Button("Cancel") { dismiss() }
+                    Button(String(localized: "common.cancel")) { dismiss() }
                         .foregroundStyle(VeloceTheme.textSecondary)
                 }
             }

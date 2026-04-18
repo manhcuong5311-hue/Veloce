@@ -20,6 +20,7 @@ struct ContentView: View {
     @State private var showEditGroups               = false
     @State private var showSettings                 = false
     @State private var showInsights                 = false
+    @State private var showApplePayImport           = false
 
     var body: some View {
         NavigationStack {
@@ -74,7 +75,7 @@ struct ContentView: View {
                         HStack(spacing: 4) {
                             Image(systemName: "sparkles")
                                 .font(.system(size: 13, weight: .semibold))
-                            Text("AI")
+                            Text("ai_tab_label")
                                 .font(.system(size: 12, weight: .semibold))
                         }
                         .foregroundStyle(VeloceTheme.accent)
@@ -83,8 +84,17 @@ struct ContentView: View {
                         .background(VeloceTheme.accentBg, in: Capsule())
                     }
                 }
-                // Insights + Settings — top-right
+                // Insights + Apple Pay import + Settings — top-right
                 ToolbarItemGroup(placement: .topBarTrailing) {
+                    if #available(iOS 18, *) {
+                        Button(action: { showApplePayImport = true }) {
+                            Image(systemName: "creditcard.fill")
+                                .font(.system(size: 15, weight: .medium))
+                                .foregroundStyle(VeloceTheme.textSecondary)
+                                .frame(width: 34, height: 34)
+                                .background(VeloceTheme.surfaceRaised, in: Circle())
+                        }
+                    }
                     Button(action: { showInsights = true }) {
                         Image(systemName: "chart.bar.xaxis")
                             .font(.system(size: 15, weight: .medium))
@@ -154,6 +164,12 @@ struct ContentView: View {
                 .environmentObject(subManager)
                 .environmentObject(vm)
                 .environmentObject(NotificationManager.shared)
+        }
+        .sheet(isPresented: $showApplePayImport) {
+            if #available(iOS 18, *) {
+                ApplePayImportSheet()
+                    .environmentObject(vm)
+            }
         }
         .preferredColorScheme(.light)
         .overlay(alignment: .bottom) {

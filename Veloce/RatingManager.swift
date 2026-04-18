@@ -198,10 +198,10 @@ struct RatingSoftPromptView: View {
 
             // Copy
             VStack(spacing: 6) {
-                Text("Enjoying Veloce?")
+                Text("rating_prompt_title")
                     .font(.system(size: 20, weight: .bold))
                     .foregroundStyle(VeloceTheme.textPrimary)
-                Text("Your feedback helps us improve.")
+                Text("rating_prompt_subtitle")
                     .font(.system(size: 14))
                     .foregroundStyle(VeloceTheme.textSecondary)
                     .multilineTextAlignment(.center)
@@ -210,7 +210,7 @@ struct RatingSoftPromptView: View {
             // Buttons
             VStack(spacing: 10) {
                 Button(action: { ratingManager.userTappedRate() }) {
-                    Text("Rate Now")
+                    Text("rating_rate_now")
                         .font(.system(size: 16, weight: .semibold))
                         .foregroundStyle(.white)
                         .frame(maxWidth: .infinity)
@@ -222,7 +222,7 @@ struct RatingSoftPromptView: View {
                 }
 
                 Button(action: { ratingManager.userTappedLater() }) {
-                    Text("Maybe Later")
+                    Text("rating_maybe_later")
                         .font(.system(size: 15, weight: .medium))
                         .foregroundStyle(VeloceTheme.textTertiary)
                         .padding(.vertical, 6)

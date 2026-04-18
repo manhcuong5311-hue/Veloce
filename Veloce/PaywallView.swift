@@ -51,8 +51,8 @@ struct PaywallView: View {
 
     /// Trial copy pulled from the real product offer, e.g. "7-day free trial".
     private var yearlySubtext: String {
-        let trial = subManager.yearlyTrialDescription ?? "7-day free trial"
-        return "\(trial) · Cancel anytime"
+        let trial = subManager.yearlyTrialDescription ?? String(localized: "paywall_trial_fallback")
+        return "\(trial) · \(String(localized: "paywall_cancel_anytime"))"
     }
 
     private var isLoading: Bool { subManager.isLoadingProducts }
@@ -105,10 +105,10 @@ struct PaywallView: View {
             }
         }
         .preferredColorScheme(.dark)
-        .alert("Purchase Failed", isPresented: $showError) {
+        .alert("paywall_purchase_failed", isPresented: $showError) {
             Button("OK", role: .cancel) { subManager.errorMessage = nil }
         } message: {
-            Text(subManager.errorMessage ?? "Something went wrong. Please try again.")
+            Text(subManager.errorMessage ?? String(localized: "paywall_error_generic"))
         }
         .onAppear {
             withAnimation(.easeInOut(duration: 1.8).repeatForever(autoreverses: true)) {
@@ -167,7 +167,7 @@ struct PaywallView: View {
             }
 
             VStack(spacing: 8) {
-                Text("Unlock Premium")
+                Text("paywall_title")
                     .font(.system(size: 32, weight: .bold, design: .rounded))
                     .foregroundStyle(.white)
 
@@ -175,7 +175,7 @@ struct PaywallView: View {
                     HStack(spacing: 6) {
                         Image(systemName: "lock.open.fill")
                             .font(.system(size: 12, weight: .semibold))
-                        Text("Unlock \(feature)")
+                        Text(String(format: String(localized: "paywall_unlock_feature_fmt"), feature))
                             .font(.system(size: 13, weight: .semibold))
                     }
                     .foregroundStyle(.white)
@@ -185,7 +185,7 @@ struct PaywallView: View {
                     .overlay(Capsule().strokeBorder(.white.opacity(0.18), lineWidth: 1))
                     .transition(.scale.combined(with: .opacity))
                 } else {
-                    Text("Take full control of your finances")
+                    Text("paywall_hero_subtitle")
                         .font(.system(size: 16))
                         .foregroundStyle(.white.opacity(0.55))
                         .multilineTextAlignment(.center)
@@ -204,36 +204,36 @@ struct PaywallView: View {
             FeatureRow(
                 icon:  "chart.bar.doc.horizontal.fill",
                 color: Color(hex: "A99CF5"),
-                title: "All 9 AI Insights",
-                subtitle: "Anomaly detection, trends, behavioral analysis & more"
+                title: "paywall_feature_insights_title",
+                subtitle: "paywall_feature_insights_subtitle"
             )
             rowDivider
             FeatureRow(
                 icon:  "sparkles",
                 color: Color(hex: "9B8BF4"),
-                title: "50 AI messages / day",
-                subtitle: "Personal finance AI — ask anything about your money"
+                title: "paywall_feature_ai_title",
+                subtitle: "paywall_feature_ai_subtitle"
             )
             rowDivider
             FeatureRow(
                 icon:  "arrow.clockwise.circle.fill",
                 color: Color(hex: "7EC8A4"),
-                title: "Recurring transactions",
-                subtitle: "Auto-log rent, subscriptions & bills every cycle"
+                title: "paywall_feature_recurring_title",
+                subtitle: "paywall_feature_recurring_subtitle"
             )
             rowDivider
             FeatureRow(
                 icon:  "paintpalette.fill",
                 color: Color(hex: "F0A070"),
-                title: "Unlimited categories + customization",
-                subtitle: "Free plan: 6 categories · Pro: unlimited with custom icons & colors"
+                title: "paywall_feature_categories_title",
+                subtitle: "paywall_feature_categories_subtitle"
             )
             rowDivider
             FeatureRow(
                 icon:  "arrow.up.arrow.down.circle.fill",
                 color: Color(hex: "5B8DB8"),
-                title: "Full history + export / import",
-                subtitle: "Free: 30-day view · Pro: unlimited history & JSON backup"
+                title: "paywall_feature_history_title",
+                subtitle: "paywall_feature_history_subtitle"
             )
         }
         .padding(.vertical, 6)
@@ -257,10 +257,10 @@ struct PaywallView: View {
         VStack(spacing: 10) {
             // Lifetime
             PlanCard(
-                title:       "Lifetime",
+                title:       "paywall_plan_lifetime",
                 price:       isLoading ? "···"    : price(for: .lifetime),
-                badge:       "BEST VALUE",
-                description: "One-time payment · Yours forever",
+                badge:       "paywall_plan_best_value",
+                description: String(localized: "paywall_plan_lifetime_desc"),
                 isSelected:  selectedPlan == .lifetime
             ) {
                 withAnimation(.spring(response: 0.22)) { selectedPlan = .lifetime }
@@ -268,7 +268,7 @@ struct PaywallView: View {
 
             // Yearly (with trial copy from real product offer)
             PlanCard(
-                title:       "Yearly",
+                title:       "paywall_plan_yearly",
                 price:       isLoading ? "···"    : price(for: .yearly),
                 badge:       nil,
                 description: yearlySubtext,
@@ -300,7 +300,7 @@ struct PaywallView: View {
                     if isPurchasing {
                         ProgressView().tint(.white)
                     } else {
-                        Text("Upgrade to Premium")
+                        Text("paywall_upgrade_btn")
                             .font(.system(size: 17, weight: .semibold))
                             .foregroundStyle(.white)
                     }
@@ -316,7 +316,7 @@ struct PaywallView: View {
                 if isRestoring {
                     ProgressView().tint(.white.opacity(0.45)).scaleEffect(0.8)
                 } else {
-                    Text("Restore Purchase")
+                    Text("paywall_restore_purchase")
                         .font(.system(size: 14, weight: .medium))
                         .foregroundStyle(.white.opacity(0.45))
                 }
@@ -336,10 +336,10 @@ struct PaywallView: View {
             Group {
                 if selectedPlan == .yearly, let trial = subManager.yearlyTrialDescription {
                     // e.g. "After your 7-day free trial, $9.99/year billed to your Apple ID."
-                    Text(verbatim: "After your \(trial), \(price(for: .yearly))/year billed to your Apple ID.")
+                    Text(String(format: String(localized: "paywall_billing_yearly_fmt"), trial, price(for: .yearly)))
                 } else {
                     // Lifetime: single charge, no renewal
-                    Text(verbatim: "\(price(for: .lifetime)) charged once to your Apple ID — no subscription.")
+                    Text(String(format: String(localized: "paywall_billing_lifetime_fmt"), price(for: .lifetime)))
                 }
             }
             .font(.system(size: 11, weight: .medium))
@@ -348,7 +348,7 @@ struct PaywallView: View {
 
             // Renewal disclosure (yearly only)
             if selectedPlan == .yearly {
-                Text("Subscription renews automatically. Cancel anytime in App Store settings at least 24 hours before renewal.")
+                Text("paywall_billing_renewal")
                     .font(.system(size: 10))
                     .foregroundStyle(.white.opacity(0.30))
                     .multilineTextAlignment(.center)
@@ -362,13 +362,13 @@ struct PaywallView: View {
 
     private var legalFooter: some View {
         HStack(spacing: 0) {
-            Link("Privacy Policy",
+            Link(String(localized: "paywall_privacy_policy"),
                  destination: URL(string: "https://manhcuong5311-hue.github.io/Veloce/")!)
             Text("  ·  ").foregroundStyle(.white.opacity(0.2))
-            Link("Terms of Use",
+            Link(String(localized: "paywall_terms_of_use"),
                  destination: URL(string: "https://www.apple.com/legal/internet-services/itunes/dev/stdeula/")!)
             Text("  ·  ").foregroundStyle(.white.opacity(0.2))
-            Button("Restore", action: handleRestore)
+            Button(String(localized: "paywall_restore_btn"), action: handleRestore)
                 .disabled(isAnyActionRunning)
         }
         .font(.system(size: 11))

@@ -157,7 +157,7 @@ enum OpenAIError: LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case .emptyResponse:     return "AI returned an empty response. Please try again."
+        case .emptyResponse:     return String(localized: "openai_error_empty_response")
         case .apiError(let msg): return msg
         }
     }
