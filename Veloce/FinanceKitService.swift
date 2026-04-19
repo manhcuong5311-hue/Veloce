@@ -118,7 +118,7 @@ final class FinanceKitService {
              .standingOrder, .directDebit, .check:
             return true
         case .deposit, .directDeposit, .dividend, .interest,
-             .refund, .adjustment, .loan, .unknown:
+             .refund, .adjustment, .loan, .transfer, .unknown:
             return false
         @unknown default:
             return false

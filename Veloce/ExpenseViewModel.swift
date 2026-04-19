@@ -519,19 +519,23 @@ final class ExpenseViewModel: ObservableObject {
 
     /// Called on app foreground — auto-adds any overdue recurring expenses
     /// and advances their next-due date.
+    /// Uses a while loop per item so ALL missed periods are caught up in one
+    /// call, not just one period per app-open (e.g. 3 months overdue → 3 expenses).
     func processOverdueRecurring() {
         var changed = false
-        for i in recurringExpenses.indices where recurringExpenses[i].isDue {
-            let r = recurringExpenses[i]
-            addExpense(Expense(
-                title:      r.title,
-                amount:     r.amount,
-                categoryId: r.categoryId,
-                date:       r.nextDueDate,
-                note:       r.note.isEmpty ? "Auto-added (recurring)" : r.note
-            ))
-            recurringExpenses[i].advance()
-            changed = true
+        for i in recurringExpenses.indices {
+            while recurringExpenses[i].isDue {
+                let r = recurringExpenses[i]
+                addExpense(Expense(
+                    title:      r.title,
+                    amount:     r.amount,
+                    categoryId: r.categoryId,
+                    date:       r.nextDueDate,
+                    note:       r.note.isEmpty ? "Auto-added (recurring)" : r.note
+                ))
+                recurringExpenses[i].advance()
+                changed = true
+            }
         }
         if changed { PersistenceStore.shared.saveRecurringSync(recurringExpenses) }
     }

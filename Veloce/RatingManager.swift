@@ -92,7 +92,7 @@ final class RatingManager: ObservableObject {
         // Request native review dialog
         if let scene = UIApplication.shared.connectedScenes
             .compactMap({ $0 as? UIWindowScene }).first {
-            Task { await AppStore.requestReview(in: scene) }
+            AppStore.requestReview(in: scene)
         }
     }
 

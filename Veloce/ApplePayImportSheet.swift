@@ -1,4 +1,5 @@
 import SwiftUI
+#if os(iOS)
 import FinanceKit
 import FinanceKitUI
 
@@ -305,3 +306,4 @@ struct ApplePayImportSheet: View {
         dismiss()
     }
 }
+#endif

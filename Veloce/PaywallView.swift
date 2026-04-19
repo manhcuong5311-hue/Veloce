@@ -6,6 +6,8 @@ import StoreKit
 // Design decisions:
 //   • Prices come from `product.displayPrice` — App Store localises them
 //     automatically (e.g. "$9.99", "9,99 €", "249.000 ₫").
+//   • Yearly plan shows a per-month equivalent (product.price / 12) so the
+//     user sees a smaller number ("$0.83/mo") with the annual total below.
 //   • Feature copy says "50 AI messages / day" (not "unlimited") to match
 //     the actual SubscriptionManager.proAILimit = 50 hard cap.
 //   • Trial copy is derived from `subManager.yearlyTrialDescription` so it
@@ -29,7 +31,6 @@ struct PaywallView: View {
     @State private var isPurchasing            = false
     @State private var isRestoring             = false
     @State private var showError               = false
-    @State private var glowPulse               = false
 
     enum PlanType: String {
         case lifetime = "com.veloce.lifetime"
@@ -49,6 +50,13 @@ struct PaywallView: View {
         }
     }
 
+    /// Monthly equivalent for the yearly plan, formatted in the correct locale.
+    private var yearlyMonthlyPrice: String {
+        guard let product = yearlyProduct else { return "$0.83" }
+        let monthly = product.price / 12
+        return monthly.formatted(product.priceFormatStyle)
+    }
+
     /// Trial copy pulled from the real product offer, e.g. "7-day free trial".
     private var yearlySubtext: String {
         let trial = subManager.yearlyTrialDescription ?? String(localized: "paywall_trial_fallback")
@@ -62,7 +70,7 @@ struct PaywallView: View {
 
     var body: some View {
         ZStack(alignment: .top) {
-            backgroundGradient
+            Color(hex: "F7F4EF").ignoresSafeArea()
 
             ScrollView(showsIndicators: false) {
                 VStack(spacing: 0) {
@@ -94,53 +102,25 @@ struct PaywallView: View {
                 Button { dismiss() } label: {
                     Image(systemName: "xmark")
                         .font(.system(size: 11, weight: .bold))
-                        .foregroundStyle(.white.opacity(0.55))
+                        .foregroundStyle(Color(hex: "1C1C1E").opacity(0.4))
                         .frame(width: 30, height: 30)
-                        .background(.white.opacity(0.1), in: Circle())
-                        .overlay(Circle().strokeBorder(.white.opacity(0.12), lineWidth: 1))
+                        .background(Color(hex: "1C1C1E").opacity(0.07), in: Circle())
                 }
                 .padding(.trailing, 20)
                 .padding(.top, 58)
                 .disabled(isAnyActionRunning)
             }
         }
-        .preferredColorScheme(.dark)
         .alert("paywall_purchase_failed", isPresented: $showError) {
             Button("OK", role: .cancel) { subManager.errorMessage = nil }
         } message: {
             Text(subManager.errorMessage ?? String(localized: "paywall_error_generic"))
         }
         .onAppear {
-            withAnimation(.easeInOut(duration: 1.8).repeatForever(autoreverses: true)) {
-                glowPulse = true
-            }
-            // Re-fetch products if the view appears and we have none yet.
             if subManager.products.isEmpty {
                 Task { await subManager.loadProducts() }
             }
         }
-    }
-
-    // MARK: - Background
-
-    private var backgroundGradient: some View {
-        ZStack {
-            LinearGradient(
-                colors: [Color(hex: "0D0920"), Color(hex: "1A1240"), Color(hex: "0D0920")],
-                startPoint: .topLeading, endPoint: .bottomTrailing
-            )
-            Circle()
-                .fill(Color(hex: "7B6CF0").opacity(0.18))
-                .frame(width: 320, height: 320)
-                .blur(radius: 80)
-                .offset(x: -60, y: -40)
-            Circle()
-                .fill(Color(hex: "9B8BF4").opacity(0.12))
-                .frame(width: 240, height: 240)
-                .blur(radius: 60)
-                .offset(x: 100, y: 200)
-        }
-        .ignoresSafeArea()
     }
 
     // MARK: - Hero
@@ -149,27 +129,26 @@ struct PaywallView: View {
         VStack(spacing: 18) {
             ZStack {
                 Circle()
-                    .fill(Color(hex: "7B6CF0").opacity(glowPulse ? 0.22 : 0.10))
-                    .frame(width: 110, height: 110)
-                    .blur(radius: glowPulse ? 18 : 10)
+                    .fill(Color(hex: "6B5CE7").opacity(0.10))
+                    .frame(width: 90, height: 90)
                 Circle()
                     .fill(
                         LinearGradient(
-                            colors: [Color(hex: "A99CF5"), Color(hex: "7B6CF0")],
+                            colors: [Color(hex: "A99CF5"), Color(hex: "6B5CE7")],
                             startPoint: .topLeading, endPoint: .bottomTrailing
                         )
                     )
-                    .frame(width: 80, height: 80)
-                    .shadow(color: Color(hex: "7B6CF0").opacity(0.6), radius: 20, y: 8)
+                    .frame(width: 68, height: 68)
+                    .shadow(color: Color(hex: "6B5CE7").opacity(0.25), radius: 12, y: 5)
                 Image(systemName: "sparkles")
-                    .font(.system(size: 30, weight: .semibold))
+                    .font(.system(size: 28, weight: .semibold))
                     .foregroundStyle(.white)
             }
 
             VStack(spacing: 8) {
                 Text("paywall_title")
-                    .font(.system(size: 32, weight: .bold, design: .rounded))
-                    .foregroundStyle(.white)
+                    .font(.system(size: 30, weight: .bold, design: .rounded))
+                    .foregroundStyle(Color(hex: "1C1C1E"))
 
                 if let feature = triggerFeature {
                     HStack(spacing: 6) {
@@ -178,16 +157,16 @@ struct PaywallView: View {
                         Text(String(format: String(localized: "paywall_unlock_feature_fmt"), feature))
                             .font(.system(size: 13, weight: .semibold))
                     }
-                    .foregroundStyle(.white)
+                    .foregroundStyle(Color(hex: "6B5CE7"))
                     .padding(.horizontal, 14)
                     .padding(.vertical, 6)
-                    .background(.white.opacity(0.12), in: Capsule())
-                    .overlay(Capsule().strokeBorder(.white.opacity(0.18), lineWidth: 1))
+                    .background(Color(hex: "6B5CE7").opacity(0.08), in: Capsule())
+                    .overlay(Capsule().strokeBorder(Color(hex: "6B5CE7").opacity(0.2), lineWidth: 1))
                     .transition(.scale.combined(with: .opacity))
                 } else {
                     Text("paywall_hero_subtitle")
-                        .font(.system(size: 16))
-                        .foregroundStyle(.white.opacity(0.55))
+                        .font(.system(size: 15))
+                        .foregroundStyle(Color(hex: "6C6C72"))
                         .multilineTextAlignment(.center)
                 }
             }
@@ -203,7 +182,7 @@ struct PaywallView: View {
         VStack(spacing: 0) {
             FeatureRow(
                 icon:  "chart.bar.doc.horizontal.fill",
-                color: Color(hex: "A99CF5"),
+                color: Color(hex: "6B5CE7"),
                 title: "paywall_feature_insights_title",
                 subtitle: "paywall_feature_insights_subtitle"
             )
@@ -217,21 +196,21 @@ struct PaywallView: View {
             rowDivider
             FeatureRow(
                 icon:  "arrow.clockwise.circle.fill",
-                color: Color(hex: "7EC8A4"),
+                color: Color(hex: "34C759"),
                 title: "paywall_feature_recurring_title",
                 subtitle: "paywall_feature_recurring_subtitle"
             )
             rowDivider
             FeatureRow(
                 icon:  "paintpalette.fill",
-                color: Color(hex: "F0A070"),
+                color: Color(hex: "FF9F0A"),
                 title: "paywall_feature_categories_title",
                 subtitle: "paywall_feature_categories_subtitle"
             )
             rowDivider
             FeatureRow(
                 icon:  "arrow.up.arrow.down.circle.fill",
-                color: Color(hex: "5B8DB8"),
+                color: Color(hex: "007AFF"),
                 title: "paywall_feature_history_title",
                 subtitle: "paywall_feature_history_subtitle"
             )
@@ -239,16 +218,15 @@ struct PaywallView: View {
         .padding(.vertical, 6)
         .background(
             RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .fill(.white.opacity(0.05))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 20, style: .continuous)
-                        .strokeBorder(.white.opacity(0.09), lineWidth: 1)
-                )
+                .fill(Color.white)
+                .shadow(color: .black.opacity(0.06), radius: 12, y: 4)
         )
     }
 
     private var rowDivider: some View {
-        Divider().overlay(Color.white.opacity(0.07)).padding(.leading, 52)
+        Divider()
+            .overlay(Color(hex: "EBEBEB"))
+            .padding(.leading, 52)
     }
 
     // MARK: - Plan Selector
@@ -257,22 +235,24 @@ struct PaywallView: View {
         VStack(spacing: 10) {
             // Lifetime
             PlanCard(
-                title:       "paywall_plan_lifetime",
-                price:       isLoading ? "···"    : price(for: .lifetime),
-                badge:       "paywall_plan_best_value",
-                description: String(localized: "paywall_plan_lifetime_desc"),
-                isSelected:  selectedPlan == .lifetime
+                title:        "paywall_plan_lifetime",
+                price:        isLoading ? "···" : price(for: .lifetime),
+                priceSubtext: nil,
+                badge:        "paywall_plan_best_value",
+                description:  String(localized: "paywall_plan_lifetime_desc"),
+                isSelected:   selectedPlan == .lifetime
             ) {
                 withAnimation(.spring(response: 0.22)) { selectedPlan = .lifetime }
             }
 
-            // Yearly (with trial copy from real product offer)
+            // Yearly — lead with per-month equivalent, annual total below
             PlanCard(
-                title:       "paywall_plan_yearly",
-                price:       isLoading ? "···"    : price(for: .yearly),
-                badge:       nil,
-                description: yearlySubtext,
-                isSelected:  selectedPlan == .yearly
+                title:        "paywall_plan_yearly",
+                price:        isLoading ? "···" : "\(yearlyMonthlyPrice)/mo",
+                priceSubtext: isLoading ? nil : "\(price(for: .yearly))/yr",
+                badge:        nil,
+                description:  yearlySubtext,
+                isSelected:   selectedPlan == .yearly
             ) {
                 withAnimation(.spring(response: 0.22)) { selectedPlan = .yearly }
             }
@@ -294,7 +274,6 @@ struct PaywallView: View {
                             )
                         )
                         .frame(height: 54)
-                        .shadow(color: Color(hex: "7B6CF0").opacity(0.45), radius: 16, y: 6)
                         .opacity(isAnyActionRunning ? 0.7 : 1.0)
 
                     if isPurchasing {
@@ -305,6 +284,7 @@ struct PaywallView: View {
                             .foregroundStyle(.white)
                     }
                 }
+                .shadow(color: Color(hex: "6B5CE7").opacity(0.30), radius: 12, y: 5)
             }
             .disabled(isAnyActionRunning || isLoading)
 
@@ -314,11 +294,11 @@ struct PaywallView: View {
             // Restore
             Button(action: handleRestore) {
                 if isRestoring {
-                    ProgressView().tint(.white.opacity(0.45)).scaleEffect(0.8)
+                    ProgressView().tint(Color(hex: "8E8E93")).scaleEffect(0.8)
                 } else {
                     Text("paywall_restore_purchase")
                         .font(.system(size: 14, weight: .medium))
-                        .foregroundStyle(.white.opacity(0.45))
+                        .foregroundStyle(Color(hex: "8E8E93"))
                 }
             }
             .disabled(isAnyActionRunning)
@@ -343,14 +323,14 @@ struct PaywallView: View {
                 }
             }
             .font(.system(size: 11, weight: .medium))
-            .foregroundStyle(.white.opacity(0.50))
+            .foregroundStyle(Color(hex: "8E8E93"))
             .multilineTextAlignment(.center)
 
             // Renewal disclosure (yearly only)
             if selectedPlan == .yearly {
                 Text("paywall_billing_renewal")
                     .font(.system(size: 10))
-                    .foregroundStyle(.white.opacity(0.30))
+                    .foregroundStyle(Color(hex: "AEAEB2"))
                     .multilineTextAlignment(.center)
             }
         }
@@ -364,15 +344,15 @@ struct PaywallView: View {
         HStack(spacing: 0) {
             Link(String(localized: "paywall_privacy_policy"),
                  destination: URL(string: "https://manhcuong5311-hue.github.io/Veloce/")!)
-            Text("  ·  ").foregroundStyle(.white.opacity(0.2))
+            Text("  ·  ").foregroundStyle(Color(hex: "C7C7CC"))
             Link(String(localized: "paywall_terms_of_use"),
                  destination: URL(string: "https://www.apple.com/legal/internet-services/itunes/dev/stdeula/")!)
-            Text("  ·  ").foregroundStyle(.white.opacity(0.2))
+            Text("  ·  ").foregroundStyle(Color(hex: "C7C7CC"))
             Button(String(localized: "paywall_restore_btn"), action: handleRestore)
                 .disabled(isAnyActionRunning)
         }
         .font(.system(size: 11))
-        .foregroundStyle(.white.opacity(0.28))
+        .foregroundStyle(Color(hex: "AEAEB2"))
         .multilineTextAlignment(.center)
     }
 
@@ -428,7 +408,7 @@ private struct FeatureRow: View {
         HStack(spacing: 14) {
             ZStack {
                 RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .fill(color.opacity(0.18))
+                    .fill(color.opacity(0.12))
                     .frame(width: 36, height: 36)
                 Image(systemName: icon)
                     .font(.system(size: 14, weight: .semibold))
@@ -437,15 +417,15 @@ private struct FeatureRow: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
                     .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(Color(hex: "1C1C1E"))
                 Text(subtitle)
                     .font(.system(size: 12))
-                    .foregroundStyle(.white.opacity(0.42))
+                    .foregroundStyle(Color(hex: "8E8E93"))
             }
             Spacer()
             Image(systemName: "checkmark")
                 .font(.system(size: 11, weight: .bold))
-                .foregroundStyle(color.opacity(0.8))
+                .foregroundStyle(color)
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 14)
@@ -455,13 +435,14 @@ private struct FeatureRow: View {
 // MARK: - PlanCard
 
 private struct PlanCard: View {
-    let title:       LocalizedStringKey
-    let price:       String
-    let badge:       LocalizedStringKey?
-    let description: String   // String (not LocalizedStringKey) because yearly
-                              // description is built at runtime from product data.
-    let isSelected:  Bool
-    let onTap:       () -> Void
+    let title:        LocalizedStringKey
+    let price:        String
+    let priceSubtext: String?   // e.g. "$9.99/yr" shown below the monthly price
+    let badge:        LocalizedStringKey?
+    let description:  String    // String (not LocalizedStringKey) because yearly
+                                // description is built at runtime from product data.
+    let isSelected:   Bool
+    let onTap:        () -> Void
 
     var body: some View {
         Button(action: onTap) {
@@ -470,12 +451,12 @@ private struct PlanCard: View {
                 ZStack {
                     Circle()
                         .strokeBorder(
-                            isSelected ? Color(hex: "A99CF5") : .white.opacity(0.2),
+                            isSelected ? Color(hex: "6B5CE7") : Color(hex: "C7C7CC"),
                             lineWidth: 2
                         )
                         .frame(width: 22, height: 22)
                     if isSelected {
-                        Circle().fill(Color(hex: "A99CF5")).frame(width: 12, height: 12)
+                        Circle().fill(Color(hex: "6B5CE7")).frame(width: 12, height: 12)
                     }
                 }
 
@@ -483,41 +464,49 @@ private struct PlanCard: View {
                     HStack(spacing: 7) {
                         Text(title)
                             .font(.system(size: 15, weight: .semibold))
-                            .foregroundStyle(.white)
+                            .foregroundStyle(Color(hex: "1C1C1E"))
                         if let badge {
                             Text(badge)
                                 .font(.system(size: 8, weight: .bold))
-                                .foregroundStyle(Color(hex: "A99CF5"))
+                                .foregroundStyle(Color(hex: "6B5CE7"))
                                 .padding(.horizontal, 6)
                                 .padding(.vertical, 2)
-                                .background(Color(hex: "A99CF5").opacity(0.18), in: Capsule())
+                                .background(Color(hex: "6B5CE7").opacity(0.10), in: Capsule())
                         }
                     }
                     Text(verbatim: description)
                         .font(.system(size: 12))
-                        .foregroundStyle(.white.opacity(0.4))
+                        .foregroundStyle(Color(hex: "8E8E93"))
                 }
 
                 Spacer()
 
-                // Price (App Store-localised via product.displayPrice)
-                Text(price)
-                    .font(.system(size: 15, weight: .bold, design: .rounded))
-                    .foregroundStyle(.white)
-                    .redacted(reason: price == "···" ? .placeholder : [])
+                // Price column — two lines when priceSubtext is provided
+                VStack(alignment: .trailing, spacing: 2) {
+                    Text(price)
+                        .font(.system(size: 15, weight: .bold, design: .rounded))
+                        .foregroundStyle(Color(hex: "1C1C1E"))
+                        .redacted(reason: price == "···" ? .placeholder : [])
+                    if let subtext = priceSubtext {
+                        Text(subtext)
+                            .font(.system(size: 11))
+                            .foregroundStyle(Color(hex: "8E8E93"))
+                    }
+                }
             }
             .padding(16)
             .background(
                 RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .fill(isSelected ? Color(hex: "7B6CF0").opacity(0.20) : .white.opacity(0.05))
+                    .fill(isSelected ? Color(hex: "6B5CE7").opacity(0.06) : Color.white)
                     .overlay(
                         RoundedRectangle(cornerRadius: 16, style: .continuous)
                             .strokeBorder(
-                                isSelected ? Color(hex: "A99CF5").opacity(0.6) : .white.opacity(0.08),
+                                isSelected ? Color(hex: "6B5CE7").opacity(0.65) : Color(hex: "E8E3DC"),
                                 lineWidth: isSelected ? 1.5 : 1
                             )
                     )
             )
+            .shadow(color: .black.opacity(isSelected ? 0.0 : 0.04), radius: 6, y: 2)
             .animation(.spring(response: 0.22), value: isSelected)
         }
         .buttonStyle(.plain)
