@@ -88,19 +88,19 @@ struct SettingsView: View {
                 }
             }
         }
-        .sheet(isPresented: $showPaywall) {
+        .adaptiveSheet(isPresented: $showPaywall) {
             PaywallView().environmentObject(subManager)
         }
-        .sheet(isPresented: $showShareSheet) {
+        .adaptiveSheet(isPresented: $showShareSheet) {
             if let url = exportedFileURL { ShareSheet(activityItems: [url]) }
         }
-        .sheet(isPresented: $showPDFShareSheet) {
+        .adaptiveSheet(isPresented: $showPDFShareSheet) {
             if let url = pdfReportURL { ShareSheet(activityItems: [url]) }
         }
-        .sheet(isPresented: $showImportPicker) {
+        .adaptiveSheet(isPresented: $showImportPicker) {
             DocumentPicker(allowedTypes: [.json]) { url in handleImport(url: url) }
         }
-        .sheet(isPresented: $showEditSalary) {
+        .adaptiveSheet(isPresented: $showEditSalary) {
             AmountEditSheet(
                 title:   "settings_monthly_salary",
                 icon:    "banknote",
@@ -108,7 +108,7 @@ struct SettingsView: View {
                 hint:    "settings_salary_hint"
             ) { vm.monthlyIncome = $0 }
         }
-        .sheet(isPresented: $showEditSaving) {
+        .adaptiveSheet(isPresented: $showEditSaving) {
             AmountEditSheet(
                 title:   "settings_saving_target",
                 icon:    "target",
@@ -116,15 +116,15 @@ struct SettingsView: View {
                 hint:    "settings_saving_hint"
             ) { vm.savingGoal = $0 }
         }
-        .sheet(isPresented: $showBudgetResetDay) {
+        .adaptiveSheet(isPresented: $showBudgetResetDay) {
             BudgetResetDaySheet()
         }
-        .sheet(isPresented: $showRecurring) {
+        .adaptiveSheet(isPresented: $showRecurring) {
             RecurringTransactionsView()
                 .environmentObject(vm)
                 .environmentObject(subManager)
         }
-        .sheet(isPresented: $showReminderTimePicker) {
+        .adaptiveSheet(isPresented: $showReminderTimePicker) {
             ReminderTimePickerSheet(notifMgr: notifMgr)
         }
         .confirmationDialog(
@@ -904,95 +904,100 @@ private struct AmountEditSheet: View {
     private var parsed: Double? { Double(text.filter { $0.isNumber }) }
     private var isValid: Bool   { (parsed ?? 0) > 0 }
 
+    private var isIPad: Bool { UIDevice.current.userInterfaceIdiom == .pad }
+
     var body: some View {
         NavigationStack {
             ZStack {
                 VeloceTheme.bg.ignoresSafeArea()
-                VStack(spacing: 20) {
-                    // Hero
-                    VStack(spacing: 8) {
-                        Image(systemName: icon)
-                            .font(.system(size: 28, weight: .medium))
-                            .foregroundStyle(VeloceTheme.accent)
-                            .frame(width: 64, height: 64)
-                            .background(VeloceTheme.accentBg, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                ScrollView {
+                    VStack(spacing: 24) {
+                        // Hero
+                        VStack(spacing: 10) {
+                            Image(systemName: icon)
+                                .font(.system(size: isIPad ? 40 : 28, weight: .medium))
+                                .foregroundStyle(VeloceTheme.accent)
+                                .frame(width: isIPad ? 88 : 64, height: isIPad ? 88 : 64)
+                                .background(VeloceTheme.accentBg, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
 
-                        Text(title)
-                            .font(.system(size: 17, weight: .semibold))
-                            .foregroundStyle(VeloceTheme.textPrimary)
-
-                        Text(hint)
-                            .font(.system(size: 13))
-                            .foregroundStyle(VeloceTheme.textSecondary)
-                            .multilineTextAlignment(.center)
-                    }
-                    .padding(.top, 8)
-
-                    // Amount input
-                    VStack(spacing: 6) {
-                        Text(String(localized: "expense.amount"))
-
-                            .font(.system(size: 12, weight: .medium))
-                            .foregroundStyle(VeloceTheme.textSecondary)
-                            .tracking(0.3)
-
-                        HStack(alignment: .lastTextBaseline, spacing: 4) {
-                            if AppCurrency.current.symbolLeading {
-                                Text(AppCurrency.current.symbol)
-                                    .font(.system(size: 24, weight: .semibold))
-                                    .foregroundStyle(VeloceTheme.textTertiary)
-                                    .offset(y: -3)
-                            }
-                            TextField("0", text: $text)
-                                .font(.system(size: 48, weight: .bold, design: .rounded))
+                            Text(title)
+                                .font(.system(size: isIPad ? 22 : 17, weight: .semibold))
                                 .foregroundStyle(VeloceTheme.textPrimary)
-                                .tint(VeloceTheme.accent)
-                                .keyboardType(.numberPad)
+
+                            Text(hint)
+                                .font(.system(size: isIPad ? 15 : 13))
+                                .foregroundStyle(VeloceTheme.textSecondary)
                                 .multilineTextAlignment(.center)
-                                .focused($focused)
-                                .frame(maxWidth: 220)
-                                .onChange(of: text) { _, newVal in
-                                    let digits = newVal.filter { $0.isNumber }
-                                    let fmt    = Double.formatAmountInput(digits)
-                                    if fmt != text { text = fmt }
+                        }
+                        .padding(.top, isIPad ? 40 : 8)
+
+                        // Amount input
+                        VStack(spacing: 8) {
+                            Text(String(localized: "expense.amount"))
+                                .font(.system(size: isIPad ? 14 : 12, weight: .medium))
+                                .foregroundStyle(VeloceTheme.textSecondary)
+                                .tracking(0.3)
+
+                            HStack(alignment: .lastTextBaseline, spacing: 4) {
+                                if AppCurrency.current.symbolLeading {
+                                    Text(AppCurrency.current.symbol)
+                                        .font(.system(size: isIPad ? 36 : 24, weight: .semibold))
+                                        .foregroundStyle(VeloceTheme.textTertiary)
+                                        .offset(y: -3)
                                 }
-                            if !AppCurrency.current.symbolLeading {
-                                Text(AppCurrency.current.symbol)
-                                    .font(.system(size: 24, weight: .semibold))
+                                TextField("0", text: $text)
+                                    .font(.system(size: isIPad ? 72 : 48, weight: .bold, design: .rounded))
+                                    .foregroundStyle(VeloceTheme.textPrimary)
+                                    .tint(VeloceTheme.accent)
+                                    .keyboardType(.numberPad)
+                                    .multilineTextAlignment(.center)
+                                    .focused($focused)
+                                    .frame(maxWidth: isIPad ? 480 : 220)
+                                    .onChange(of: text) { _, newVal in
+                                        let digits = newVal.filter { $0.isNumber }
+                                        let fmt    = Double.formatAmountInput(digits)
+                                        if fmt != text { text = fmt }
+                                    }
+                                if !AppCurrency.current.symbolLeading {
+                                    Text(AppCurrency.current.symbol)
+                                        .font(.system(size: isIPad ? 36 : 24, weight: .semibold))
+                                        .foregroundStyle(VeloceTheme.textTertiary)
+                                        .offset(y: -3)
+                                }
+                            }
+
+                            if let v = parsed, v > 0 {
+                                Text(v.toCurrencyString())
+                                    .font(.system(size: isIPad ? 16 : 13))
                                     .foregroundStyle(VeloceTheme.textTertiary)
-                                    .offset(y: -3)
+                                    .transition(.opacity)
                             }
                         }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, isIPad ? 44 : 28)
+                        .veloceCard(radius: 22)
+                        .animation(.spring(response: 0.3), value: parsed != nil)
 
-                        if let v = parsed, v > 0 {
-                            Text(v.toCurrencyString())
-                                .font(.system(size: 13))
-                                .foregroundStyle(VeloceTheme.textTertiary)
-                                .transition(.opacity)
+                        Button(action: save) {
+                            Text(String(localized: "common.save"))
+                                .font(.system(size: isIPad ? 19 : 16, weight: .semibold))
+                                .foregroundStyle(.white)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, isIPad ? 20 : 16)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                        .fill(isValid ? VeloceTheme.accent : VeloceTheme.divider)
+                                )
                         }
+                        .disabled(!isValid)
+                        .animation(.easeInOut(duration: 0.2), value: isValid)
+
+                        Spacer()
                     }
+                    .padding(isIPad ? 40 : 20)
+                    .frame(maxWidth: isIPad ? 560 : .infinity)
                     .frame(maxWidth: .infinity)
-                    .padding(.vertical, 28)
-                    .veloceCard(radius: 22)
-                    .animation(.spring(response: 0.3), value: parsed != nil)
-
-                    Button(action: save) {
-                        Text(String(localized: "common.save"))
-                            .font(.system(size: 16, weight: .semibold))
-                            .foregroundStyle(.white)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 16)
-                            .background(
-                                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                                    .fill(isValid ? VeloceTheme.accent : VeloceTheme.divider)
-                            )
-                    }
-                    .disabled(!isValid)
-                    .animation(.easeInOut(duration: 0.2), value: isValid)
-
-                    Spacer()
                 }
-                .padding(20)
             }
             .navigationTitle(title)
             .navigationBarTitleDisplayMode(.inline)
@@ -1005,7 +1010,7 @@ private struct AmountEditSheet: View {
                 }
             }
         }
-        .presentationDetents([.medium])
+        .presentationDetents(isIPad ? [.large] : [.medium])
         .presentationDragIndicator(.visible)
         .presentationBackground(VeloceTheme.bg)
         .onAppear {

@@ -1,5 +1,35 @@
 import SwiftUI
 
+// MARK: - Adaptive Sheet (iPad = fullScreenCover, iPhone = sheet)
+
+extension View {
+    @ViewBuilder
+    func adaptiveSheet<Content: View>(
+        isPresented: Binding<Bool>,
+        onDismiss: (() -> Void)? = nil,
+        @ViewBuilder content: @escaping () -> Content
+    ) -> some View {
+        if UIDevice.current.userInterfaceIdiom == .pad {
+            fullScreenCover(isPresented: isPresented, onDismiss: onDismiss, content: content)
+        } else {
+            sheet(isPresented: isPresented, onDismiss: onDismiss, content: content)
+        }
+    }
+
+    @ViewBuilder
+    func adaptiveSheet<Item: Identifiable, Content: View>(
+        item: Binding<Item?>,
+        onDismiss: (() -> Void)? = nil,
+        @ViewBuilder content: @escaping (Item) -> Content
+    ) -> some View {
+        if UIDevice.current.userInterfaceIdiom == .pad {
+            fullScreenCover(item: item, onDismiss: onDismiss, content: content)
+        } else {
+            sheet(item: item, onDismiss: onDismiss, content: content)
+        }
+    }
+}
+
 // MARK: - Currency
 
 enum AppCurrency: String, CaseIterable, Identifiable {

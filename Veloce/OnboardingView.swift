@@ -170,6 +170,37 @@ private struct Page2: View {
     let onSkip:     () -> Void
 
     @State private var show = false
+    @FocusState private var focusedField: Field?
+
+    private enum Field { case income, savings }
+
+    private var currency: AppCurrency { AppCurrency.current }
+
+    private var incomePlaceholder: String {
+        switch currency {
+        case .vnd: return "vd: 15.000.000"
+        case .jpy: return "例: 300,000"
+        case .krw: return "예: 3,000,000"
+        case .thb: return "เช่น: 30,000"
+        case .eur: return "e.g. 2,500"
+        case .gbp: return "e.g. 2,000"
+        case .sgd: return "e.g. 4,000"
+        default:   return "e.g. 3,000"
+        }
+    }
+
+    private var savingsPlaceholder: String {
+        switch currency {
+        case .vnd: return "vd: 3.000.000"
+        case .jpy: return "例: 60,000"
+        case .krw: return "예: 600,000"
+        case .thb: return "เช่น: 6,000"
+        case .eur: return "e.g. 500"
+        case .gbp: return "e.g. 400"
+        case .sgd: return "e.g. 800"
+        default:   return "e.g. 600"
+        }
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -193,16 +224,18 @@ private struct Page2: View {
                 VStack(spacing: 14) {
                     setupField(
                         label: String(localized: "monthly_income"),
-                        placeholder: String(localized: "monthly_income_placeholder"),
+                        placeholder: incomePlaceholder,
                         icon: "banknote",
-                        text: $income
+                        text: $income,
+                        field: .income
                     )
 
                     setupField(
                         label: String(localized: "monthly_savings_goal"),
-                        placeholder: String(localized: "monthly_savings_goal_placeholder"),
+                        placeholder: savingsPlaceholder,
                         icon: "target",
-                        text: $savingsGoal
+                        text: $savingsGoal,
+                        field: .savings
                     )
                 }
                 .opacity(show ? 1 : 0)
@@ -232,6 +265,9 @@ private struct Page2: View {
         }
         .onAppear {
             withAnimation(.spring(response: 0.72, dampingFraction: 0.78).delay(0.08)) { show = true }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+                focusedField = .income
+            }
         }
     }
 
@@ -240,7 +276,8 @@ private struct Page2: View {
         label:       String,
         placeholder: String,
         icon:        String,
-        text:        Binding<String>
+        text:        Binding<String>,
+        field:       Field
     ) -> some View {
         VStack(alignment: .leading, spacing: 7) {
             HStack(spacing: 6) {
@@ -252,12 +289,17 @@ private struct Page2: View {
                     .foregroundStyle(VeloceTheme.textSecondary)
                     .textCase(.uppercase)
                     .tracking(0.4)
+                Spacer()
+                Text(currency.symbol)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(VeloceTheme.accent)
             }
 
             TextField(placeholder, text: text)
                 .font(.system(size: 17, design: .rounded))
                 .foregroundStyle(VeloceTheme.textPrimary)
                 .keyboardType(.numberPad)
+                .focused($focusedField, equals: field)
                 .padding(15)
                 .background(
                     RoundedRectangle(cornerRadius: 14, style: .continuous)
@@ -467,7 +509,7 @@ private struct PageApplePay: View {
         switch state {
         case .connected:   return "checkmark.circle.fill"
         case .denied:      return "xmark.circle.fill"
-        case .unavailable: return "creditcard.slash"
+        case .unavailable: return "creditcard.trianglebadge.exclamationmark"
         default:           return "creditcard.fill"
         }
     }

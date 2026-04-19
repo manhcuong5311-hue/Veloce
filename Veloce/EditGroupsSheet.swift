@@ -100,17 +100,17 @@ struct EditGroupsSheet: View {
         .presentationDragIndicator(.visible)
         .presentationBackground(VeloceTheme.bg)
         .preferredColorScheme(.light)
-        .sheet(item: $editingCategory) { cat in
+        .adaptiveSheet(item: $editingCategory) { cat in
             GroupEditSheet(category: cat)
                 .environmentObject(vm)
                 .environmentObject(subManager)
         }
-        .sheet(isPresented: $showAddGroup) {
+        .adaptiveSheet(isPresented: $showAddGroup) {
             NewGroupSheet()
                 .environmentObject(vm)
                 .environmentObject(subManager)
         }
-        .sheet(isPresented: $showPaywall) {
+        .adaptiveSheet(isPresented: $showPaywall) {
             PaywallView().environmentObject(subManager)
         }
     }
@@ -264,10 +264,10 @@ private struct GroupEditSheet: View {
         .presentationDragIndicator(.visible)
         .presentationBackground(VeloceTheme.bg)
         .preferredColorScheme(.light)
-        .sheet(isPresented: $showIconPicker) {
+        .adaptiveSheet(isPresented: $showIconPicker) {
             IconPickerSheet(selectedIcon: $selectedIcon)
         }
-        .sheet(isPresented: $showPaywall) {
+        .adaptiveSheet(isPresented: $showPaywall) {
             PaywallView().environmentObject(subManager)
         }
     }
@@ -703,7 +703,7 @@ private struct NewGroupSheet: View {
         .presentationDragIndicator(.visible)
         .presentationBackground(VeloceTheme.bg)
         .preferredColorScheme(.light)
-        .sheet(isPresented: $showIconPicker) {
+        .adaptiveSheet(isPresented: $showIconPicker) {
             IconPickerSheet(selectedIcon: $selectedIcon)
         }
     }

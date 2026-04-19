@@ -20,8 +20,8 @@ struct BudgetEditColumnView: View {
     let onDragEnd:       () -> Void
 
     // MARK: - Layout constants
-    private let colWidth:      CGFloat = 62
-    private let maxBarH:       CGFloat = 260    // taller than normal (200) so section expands
+    private var colWidth:      CGFloat { UIDevice.current.userInterfaceIdiom == .pad ? 96 : 62 }
+    private var maxBarH:       CGFloat { UIDevice.current.userInterfaceIdiom == .pad ? 460 : 260 }
     private let trackRadius:   CGFloat = 14
     // Snap increment: derived from the active currency so the gesture stays
     // usable after a currency switch (100_000 VND ≠ 100_000 USD).

@@ -107,7 +107,7 @@ struct ApplePayImportSheet: View {
 
     private var unavailableView: some View {
         VStack(spacing: 16) {
-            Image(systemName: "creditcard.slash")
+            Image(systemName: "creditcard.trianglebadge.exclamationmark")
                 .font(.system(size: 48))
                 .foregroundStyle(VeloceTheme.textSecondary)
 

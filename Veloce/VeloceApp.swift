@@ -16,6 +16,20 @@ struct VeloceApp: App {
 
     init() {
         FirebaseApp.configure()
+        // Set currency and speech language from device locale on first install,
+        // before any view renders so formatters always show the right symbol.
+        if UserDefaults.standard.string(forKey: "veloce_currency") == nil {
+            UserDefaults.standard.set(
+                CategoryLocalization.defaultCurrency().rawValue,
+                forKey: "veloce_currency"
+            )
+        }
+        if UserDefaults.standard.string(forKey: "veloce_speech_language") == nil {
+            UserDefaults.standard.set(
+                CategoryLocalization.defaultSpeechCode(),
+                forKey: "veloce_speech_language"
+            )
+        }
     }
 
     var body: some Scene {
@@ -28,6 +42,11 @@ struct VeloceApp: App {
                 .environmentObject(ratingMgr)
                 .task {
                     try? await CurrencyManager.shared.refreshRates()
+                }
+                .onOpenURL { url in
+                    // Required for Firebase OAuthProvider (Google sign-in) to receive
+                    // the redirect callback from SFSafariViewController back into the app.
+                    _ = Auth.auth().canHandle(url)
                 }
         }
         // Drain any pending background writes before the OS can freeze / terminate the app.

@@ -34,7 +34,7 @@ struct CategoryColumnView: View, Equatable {
     }
 
     // Layout constants
-    private let colWidth:    CGFloat = 62
+    private var colWidth:    CGFloat { UIDevice.current.userInterfaceIdiom == .pad ? 96 : 62 }
     private let trackRadius: CGFloat = 14
 
     private var barHeight: CGFloat {

@@ -138,47 +138,47 @@ struct ContentView: View {
             )
             .environmentObject(vm)
         }
-        .sheet(item: $selectedCategory) { cat in
+        .adaptiveSheet(item: $selectedCategory) { cat in
             CategoryDetailSheet(category: cat)
                 .environmentObject(vm)
                 .environmentObject(subManager)
         }
-        .sheet(isPresented: $showAddExpense, onDismiss: { quickAddCategoryId = nil }) {
+        .adaptiveSheet(isPresented: $showAddExpense, onDismiss: { quickAddCategoryId = nil }) {
             AddExpenseSheet(preselectedCategoryId: quickAddCategoryId)
                 .environmentObject(vm)
         }
-        .sheet(isPresented: $showAddRecurring) {
+        .adaptiveSheet(isPresented: $showAddRecurring) {
             AddRecurringSheet()
                 .environmentObject(vm)
                 .environmentObject(subManager)
         }
-        .sheet(isPresented: $showRecurring) {
+        .adaptiveSheet(isPresented: $showRecurring) {
             RecurringTransactionsView()
                 .environmentObject(vm)
                 .environmentObject(subManager)
         }
-        .sheet(item: $editingExpense) { exp in
+        .adaptiveSheet(item: $editingExpense) { exp in
             EditExpenseSheet(expense: exp).environmentObject(vm)
         }
-        .sheet(isPresented: $showPaywall) {
+        .adaptiveSheet(isPresented: $showPaywall) {
             PaywallView().environmentObject(subManager)
         }
-        .sheet(isPresented: $showEditGroups) {
+        .adaptiveSheet(isPresented: $showEditGroups) {
             EditGroupsSheet()
                 .environmentObject(vm)
                 .environmentObject(subManager)
         }
-        .sheet(isPresented: $showAIAssistant) {
+        .adaptiveSheet(isPresented: $showAIAssistant) {
             AIAssistantView()
                 .environmentObject(vm)
                 .environmentObject(subManager)
         }
-        .sheet(isPresented: $showInsights) {
+        .adaptiveSheet(isPresented: $showInsights) {
             InsightsView()
                 .environmentObject(vm)
                 .environmentObject(subManager)
         }
-        .sheet(isPresented: $showSettings) {
+        .adaptiveSheet(isPresented: $showSettings) {
             SettingsView()
                 .environmentObject(authVM)
                 .environmentObject(subManager)
@@ -186,7 +186,7 @@ struct ContentView: View {
                 .environmentObject(NotificationManager.shared)
         }
         #if os(iOS)
-        .sheet(isPresented: $showApplePayImport) {
+        .adaptiveSheet(isPresented: $showApplePayImport) {
             if #available(iOS 18, *) {
                 ApplePayImportSheet()
                     .environmentObject(vm)
@@ -280,7 +280,7 @@ private struct SummaryHeaderView: View {
         VStack(alignment: .leading, spacing: 20) {
             // App name + month label
             VStack(alignment: .leading, spacing: 4) {
-                Text("VeloAI")
+                Text("VeloceAI")
                     .font(.system(size: 26, weight: .bold, design: .rounded))
                     .foregroundStyle(VeloceTheme.textPrimary)
                 Text(monthYear)
@@ -408,6 +408,10 @@ private struct ColumnsCard: View {
     @State private var isDragging:  Bool    = false
     @AppStorage("spending_hint_seen") private var hintSeen: Bool = false
 
+    private var isIPad: Bool { UIDevice.current.userInterfaceIdiom == .pad }
+    private var colSpacing: CGFloat { isIPad ? 20 : 14 }
+    private var panelHeightScale: CGFloat { isIPad ? 1.8 : 1.0 }
+
     private var remainingBudget: Double {
         fixedTotalBudget - vm.totalBudget
     }
@@ -415,9 +419,10 @@ private struct ColumnsCard: View {
     /// Live bar height that tracks the finger during drag, then snaps on release
     private var effectiveBarHeight: CGFloat {
         // Negative dragOffset = dragging up = expand = more height
-        let adjusted = panelState.maxBarHeight - dragOffset
-        return min(max(adjusted, SpendingPanelState.compact.maxBarHeight),
-                   SpendingPanelState.expanded.maxBarHeight)
+        let scale = panelHeightScale
+        let adjusted = panelState.maxBarHeight * scale - dragOffset
+        return min(max(adjusted, SpendingPanelState.compact.maxBarHeight * scale),
+                   SpendingPanelState.expanded.maxBarHeight * scale)
     }
 
     var body: some View {
@@ -456,7 +461,7 @@ private struct ColumnsCard: View {
                 // ── Edit columns with programmatic scroll support ──
                 ScrollViewReader { proxy in
                     ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(alignment: .bottom, spacing: 14) {
+                        HStack(alignment: .bottom, spacing: colSpacing) {
                             ForEach(vm.visibleCategories) { cat in
                                 BudgetEditColumnView(
                                     category:      cat,
@@ -505,7 +510,7 @@ private struct ColumnsCard: View {
                 }
             } else {
                 ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(alignment: .bottom, spacing: 14) {
+                    HStack(alignment: .bottom, spacing: colSpacing) {
                         ForEach(vm.visibleCategories) { cat in
                             CategoryColumnView(
                                 category:       cat,
