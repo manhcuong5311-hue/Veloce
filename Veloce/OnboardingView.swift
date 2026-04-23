@@ -1,7 +1,5 @@
 import SwiftUI
 internal import Speech
-import FinanceKit
-
 // MARK: - OnboardingView (3 pages)
 
 struct OnboardingView: View {
@@ -15,8 +13,8 @@ struct OnboardingView: View {
 
     @AppStorage("veloce_onboarding_done") private var onboardingDone = false
 
-    // 5 pages: 0 Welcome | 1 Setup | 2 Notifications | 3 Apple Pay | 4 Try It
-    private let totalPages = 5
+    // 4 pages: 0 Welcome | 1 Setup | 2 Notifications | 3 Try It
+    private let totalPages = 4
 
     var body: some View {
         ZStack {
@@ -39,9 +37,8 @@ struct OnboardingView: View {
                             advance()
                         }
                     }, onSkip: advance).tag(2)
-                    PageApplePay(onNext: advance).tag(3)
                     Page3(input: $tryInput, parsedResult: $parsedResult,
-                          onFinish: finish).tag(4)
+                          onFinish: finish).tag(3)
                 }
                 .tabViewStyle(.page(indexDisplayMode: .never))
                 .animation(.easeInOut(duration: 0.35), value: page)
@@ -415,156 +412,6 @@ private struct PageNotification: View {
         .onAppear {
             withAnimation(.spring(response: 0.72, dampingFraction: 0.78).delay(0.08)) { show = true }
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.9) { bellBounce.toggle() }
-        }
-    }
-}
-
-// MARK: - Page Apple Pay: Import Connect
-
-private struct PageApplePay: View {
-    let onNext: () -> Void
-
-    private enum ConnectState { case idle, loading, connected, denied, unavailable }
-
-    @State private var state: ConnectState = .idle
-    @State private var show = false
-
-    var body: some View {
-        VStack(spacing: 0) {
-            Spacer()
-
-            VStack(spacing: 36) {
-                // Hero
-                ZStack {
-                    Circle()
-                        .fill(heroBackground)
-                        .frame(width: 148, height: 148)
-                    Circle()
-                        .fill(heroColor.opacity(0.10))
-                        .frame(width: 200)
-                        .blur(radius: 30)
-                    Image(systemName: heroIcon)
-                        .font(.system(size: 52, weight: .bold))
-                        .foregroundStyle(heroColor)
-                        .symbolEffect(.bounce, value: state == .connected)
-                }
-                .scaleEffect(show ? 1 : 0.6)
-                .opacity(show ? 1 : 0)
-                .animation(.spring(response: 0.4), value: state)
-
-                VStack(spacing: 14) {
-                    Text(String(localized: titleKey))
-                        .font(.system(size: 32, weight: .bold, design: .rounded))
-                        .foregroundStyle(VeloceTheme.textPrimary)
-                        .multilineTextAlignment(.center)
-                        .offset(y: show ? 0 : 16)
-                        .opacity(show ? 1 : 0)
-
-                    Text(String(localized: subtitleKey))
-                        .font(.system(size: 15))
-                        .foregroundStyle(VeloceTheme.textSecondary)
-                        .multilineTextAlignment(.center)
-                        .offset(y: show ? 0 : 12)
-                        .opacity(show ? 1 : 0)
-                }
-            }
-            .padding(.horizontal, 28)
-
-            Spacer()
-            Spacer()
-
-            VStack(spacing: 13) {
-                if state == .idle {
-                    primaryButton(String(localized: "onboarding_applepay_connect_btn"), action: connect)
-                } else if state == .loading {
-                    ProgressView()
-                        .controlSize(.large)
-                        .tint(VeloceTheme.accent)
-                        .frame(height: 56)
-                }
-
-                Button(action: onNext) {
-                    Text(state == .connected
-                         ? String(localized: "continue")
-                         : String(localized: "onboarding_applepay_skip"))
-                        .font(.system(size: 15, weight: .medium))
-                        .foregroundStyle(VeloceTheme.textTertiary)
-                }
-            }
-            .padding(.horizontal, 28)
-            .padding(.bottom, 56)
-            .opacity(show ? 1 : 0)
-        }
-        .onAppear {
-            withAnimation(.spring(response: 0.72, dampingFraction: 0.78).delay(0.08)) { show = true }
-            if !FinanceStore.isDataAvailable(.financialData) {
-                state = .unavailable
-            }
-        }
-    }
-
-    // MARK: Dynamic content per state
-
-    private var heroIcon: String {
-        switch state {
-        case .connected:   return "checkmark.circle.fill"
-        case .denied:      return "xmark.circle.fill"
-        case .unavailable: return "creditcard.trianglebadge.exclamationmark"
-        default:           return "creditcard.fill"
-        }
-    }
-
-    private var heroColor: Color {
-        switch state {
-        case .connected: return VeloceTheme.ok
-        case .denied:    return VeloceTheme.over
-        default:         return VeloceTheme.accent
-        }
-    }
-
-    private var heroBackground: Color {
-        switch state {
-        case .connected: return VeloceTheme.ok.opacity(0.12)
-        case .denied:    return VeloceTheme.over.opacity(0.12)
-        default:         return VeloceTheme.accentBg
-        }
-    }
-
-    private var titleKey: String.LocalizationValue {
-        switch state {
-        case .connected:   return "onboarding_applepay_connected"
-        case .denied:      return "onboarding_applepay_denied"
-        case .unavailable: return "apple_pay_not_available"
-        default:           return "onboarding_applepay_title"
-        }
-    }
-
-    private var subtitleKey: String.LocalizationValue {
-        switch state {
-        case .connected:   return "onboarding_applepay_connected_desc"
-        case .denied:      return "onboarding_applepay_denied_desc"
-        case .unavailable: return "apple_pay_not_available_desc"
-        default:           return "onboarding_applepay_subtitle"
-        }
-    }
-
-    // MARK: Action
-
-    private func connect() {
-        state = .loading
-        Task { @MainActor in
-            do {
-                let status = try await FinanceStore.shared.requestAuthorization()
-                withAnimation(.spring(response: 0.4)) {
-                    state = (status == .authorized) ? .connected : .denied
-                }
-                if status == .authorized {
-                    try? await Task.sleep(for: .milliseconds(1400))
-                    onNext()
-                }
-            } catch {
-                withAnimation { state = .denied }
-            }
         }
     }
 }

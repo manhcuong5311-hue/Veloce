@@ -21,9 +21,6 @@ struct ContentView: View {
     @State private var showEditGroups               = false
     @State private var showSettings                 = false
     @State private var showInsights                 = false
-    #if os(iOS)
-    @State private var showApplePayImport           = false
-    #endif
 
     var body: some View {
         NavigationStack {
@@ -87,31 +84,9 @@ struct ContentView: View {
                         .background(VeloceTheme.accentBg, in: Capsule())
                     }
                 }
-                // Insights + Apple Pay import + Recurring + Settings — top-right
                 ToolbarItemGroup(placement: .topBarTrailing) {
-                    #if os(iOS)
-                    if #available(iOS 18, *) {
-                        Button(action: { showApplePayImport = true }) {
-                            Image(systemName: "creditcard.fill")
-                                .font(.system(size: 15, weight: .medium))
-                                .foregroundStyle(VeloceTheme.textSecondary)
-                                .frame(width: 34, height: 34)
-                                .background(VeloceTheme.surfaceRaised, in: Circle())
-                        }
-                    }
-                    #endif
                     Button(action: { showInsights = true }) {
                         Image(systemName: "chart.bar.xaxis")
-                            .font(.system(size: 15, weight: .medium))
-                            .foregroundStyle(VeloceTheme.textSecondary)
-                            .frame(width: 34, height: 34)
-                            .background(VeloceTheme.surfaceRaised, in: Circle())
-                    }
-                    Button(action: {
-                        if subManager.isProUser { showRecurring = true }
-                        else { showPaywall = true }
-                    }) {
-                        Image(systemName: "arrow.clockwise.circle.fill")
                             .font(.system(size: 15, weight: .medium))
                             .foregroundStyle(VeloceTheme.textSecondary)
                             .frame(width: 34, height: 34)
@@ -185,14 +160,6 @@ struct ContentView: View {
                 .environmentObject(vm)
                 .environmentObject(NotificationManager.shared)
         }
-        #if os(iOS)
-        .adaptiveSheet(isPresented: $showApplePayImport) {
-            if #available(iOS 18, *) {
-                ApplePayImportSheet()
-                    .environmentObject(vm)
-            }
-        }
-        #endif
         .preferredColorScheme(.light)
         .overlay(alignment: .bottom) {
             RatingSoftPromptView(ratingManager: ratingMgr)

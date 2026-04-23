@@ -4848,6 +4848,7 @@
       }
     },
     "onboarding_applepay_connect_btn" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -4864,6 +4865,7 @@
       }
     },
     "onboarding_applepay_connected" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -4880,6 +4882,7 @@
       }
     },
     "onboarding_applepay_connected_desc" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -4896,6 +4899,7 @@
       }
     },
     "onboarding_applepay_denied" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -4912,6 +4916,7 @@
       }
     },
     "onboarding_applepay_denied_desc" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -4928,6 +4933,7 @@
       }
     },
     "onboarding_applepay_skip" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -4944,6 +4950,7 @@
       }
     },
     "onboarding_applepay_subtitle" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -4960,6 +4967,7 @@
       }
     },
     "onboarding_applepay_title" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
