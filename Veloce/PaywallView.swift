@@ -238,19 +238,20 @@ struct PaywallView: View {
                 title:        "paywall_plan_lifetime",
                 price:        isLoading ? "···" : price(for: .lifetime),
                 priceSubtext: nil,
-                badge:        "paywall_plan_best_value",
+                badge:        String(localized: "paywall_plan_best_value"),
                 description:  String(localized: "paywall_plan_lifetime_desc"),
                 isSelected:   selectedPlan == .lifetime
             ) {
                 withAnimation(.spring(response: 0.22)) { selectedPlan = .lifetime }
             }
 
-            // Yearly — lead with per-month equivalent, annual total below
+            // Yearly — billed amount is primary (App Store guideline 3.1.2c); monthly equivalent is subordinate.
+            // Badge shows the introductory offer duration pulled live from the StoreKit product.
             PlanCard(
                 title:        "paywall_plan_yearly",
-                price:        isLoading ? "···" : "\(yearlyMonthlyPrice)/mo",
-                priceSubtext: isLoading ? nil : "\(price(for: .yearly))/yr",
-                badge:        nil,
+                price:        isLoading ? "···" : "\(price(for: .yearly))/yr",
+                priceSubtext: isLoading ? nil : "\(yearlyMonthlyPrice)/mo",
+                badge:        isLoading ? nil : subManager.yearlyTrialDescription,
                 description:  yearlySubtext,
                 isSelected:   selectedPlan == .yearly
             ) {
@@ -437,8 +438,8 @@ private struct FeatureRow: View {
 private struct PlanCard: View {
     let title:        LocalizedStringKey
     let price:        String
-    let priceSubtext: String?   // e.g. "$9.99/yr" shown below the monthly price
-    let badge:        LocalizedStringKey?
+    let priceSubtext: String?   // e.g. "$0.83/mo" shown below the billed amount
+    let badge:        String?   // String so both localized keys and dynamic trial text work
     let description:  String    // String (not LocalizedStringKey) because yearly
                                 // description is built at runtime from product data.
     let isSelected:   Bool
@@ -466,7 +467,7 @@ private struct PlanCard: View {
                             .font(.system(size: 15, weight: .semibold))
                             .foregroundStyle(Color(hex: "1C1C1E"))
                         if let badge {
-                            Text(badge)
+                            Text(verbatim: badge)
                                 .font(.system(size: 8, weight: .bold))
                                 .foregroundStyle(Color(hex: "6B5CE7"))
                                 .padding(.horizontal, 6)
