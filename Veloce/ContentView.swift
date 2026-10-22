@@ -103,6 +103,10 @@ struct ContentView: View {
             }
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
+            VStack(spacing: 0) {
+            // AdMob banner right above the input bar; hidden while typing.
+            AdBannerView()
+                .background(VeloceTheme.bg)
             InputBarView(
                 onAITap:        handleAITap,
                 onManualAdd:    { showAddExpense = true },
@@ -112,6 +116,7 @@ struct ContentView: View {
                 }
             )
             .environmentObject(vm)
+            }
         }
         .adaptiveSheet(item: $selectedCategory) { cat in
             CategoryDetailSheet(category: cat)
@@ -136,7 +141,7 @@ struct ContentView: View {
             EditExpenseSheet(expense: exp).environmentObject(vm)
         }
         .adaptiveSheet(isPresented: $showPaywall) {
-            PaywallView().environmentObject(subManager)
+            RemoveAdsSheet().environmentObject(subManager)
         }
         .adaptiveSheet(isPresented: $showEditGroups) {
             EditGroupsSheet()
@@ -168,31 +173,14 @@ struct ContentView: View {
         .onAppear {
             RatingManager.shared.recordActiveDay()
             vm.processOverdueRecurring()
-            checkDay7Paywall()
             checkWeeklyDigest()
+            // Consent / ATT / ads start only once the main screen is up.
+            AdsManager.shared.activate()
         }
         .onChange(of: scenePhase) { _, phase in
             if phase == .active {
                 vm.processOverdueRecurring()
             }
-        }
-        // Soft paywall: trigger after 20th expense for free users
-        .onChange(of: vm.softPaywallTrigger) { _, triggered in
-            if triggered && !subManager.isProUser {
-                showPaywall = true
-                vm.softPaywallTrigger = false
-            } else if triggered {
-                vm.softPaywallTrigger = false
-            }
-        }
-    }
-
-    private func checkDay7Paywall() {
-        guard subManager.shouldShowDay7Paywall else { return }
-        subManager.markDay7PaywallShown()
-        // Delay 2 s so the main UI renders before the sheet appears.
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
-            showPaywall = true
         }
     }
 
@@ -222,12 +210,10 @@ struct ContentView: View {
         return "\(comps.yearForWeekOfYear ?? 0)-W\(comps.weekOfYear ?? 0)"
     }
 
+    /// The assistant shows the remaining daily allowance (and the limit
+    /// message once it is used up), so it always opens.
     private func handleAITap() {
-        if subManager.isProUser || subManager.canUseAI {
-            showAIAssistant = true
-        } else {
-            showPaywall = true
-        }
+        showAIAssistant = true
     }
 }
 

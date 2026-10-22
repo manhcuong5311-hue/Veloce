@@ -86,7 +86,7 @@ struct CategoryDetailSheet: View {
             EditExpenseSheet(expense: exp).environmentObject(vm)
         }
         .sheet(isPresented: $showPaywall) {
-            PaywallView().environmentObject(subManager)
+            RemoveAdsSheet().environmentObject(subManager)
         }
         .alert(
             String(localized: "budget.error.update"),

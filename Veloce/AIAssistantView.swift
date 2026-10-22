@@ -42,7 +42,7 @@ struct AIAssistantView: View {
                 VeloceTheme.bg.ignoresSafeArea()
 
                 VStack(spacing: 0) {
-                    if !subManager.isProUser {
+                    if !subManager.hasLegacyPro {
                         usageBanner
                     }
                     messageList
@@ -337,10 +337,10 @@ struct AIAssistantView: View {
         // Determine if this send should be counted against the AI limit.
         // The FIRST message in an insight-card session (the auto-prompt) is free
         // so free users get a taste of AI insights before hitting the wall.
-        let isFreeInsightSend = isInsightPrompt && !insightFreeUsed && !subManager.isProUser
+        let isFreeInsightSend = isInsightPrompt && !insightFreeUsed && !subManager.hasLegacyPro
 
         if !isFreeInsightSend && !subManager.canUseAI {
-            if subManager.isProUser {
+            if subManager.hasLegacyPro {
                 // Silent soft-cap — never mention the number
                 messages.append(ChatMessage(
                     role: .error,
@@ -349,7 +349,7 @@ struct AIAssistantView: View {
             } else {
                 messages.append(ChatMessage(
                     role: .error,
-                    content: String(format: String(localized: "ai_daily_limit_free_fmt"), SubscriptionManager.freeAILimit)
+                    content: String(format: String(localized: "ai_daily_limit_free_fmt"), subManager.aiDailyLimit)
                 ))
             }
             return

@@ -31,7 +31,6 @@ final class ExpenseViewModel: ObservableObject {
     @Published var isHeightRelative = false
 
     /// Set to true when the 20th expense is added (free users → show paywall).
-    @Published var softPaywallTrigger: Bool = false
 
     // Settings — @Published so any view binding to vm updates reactively
     @Published var monthlyIncome: Double = 0
@@ -136,10 +135,8 @@ final class ExpenseViewModel: ObservableObject {
         RatingManager.shared.recordActiveDay()
         RatingManager.shared.evaluateAfterPositiveAction()
 
-        // Soft paywall: fire once when the user reaches 20 expenses
-        if !softPaywallTrigger && expenses.count == 20 {
-            softPaywallTrigger = true
-        }
+        // Counts toward the interstitial frequency cap.
+        AdsManager.shared.recordAction()
     }
 
     func deleteExpense(_ expense: Expense) {

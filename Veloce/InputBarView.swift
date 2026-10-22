@@ -215,13 +215,16 @@ struct InputBarView: View {
     private func doParseAndApply(_ trimmed: String) async {
         defer { isParsing = false }
 
-        // Cloud-first: attempt the LLM parser; fall through to local on any error.
+        // Cloud-first (within the daily fair-use limit): attempt the LLM parser;
+        // fall through to the on-device parser on any error or once the limit is used.
         let catNames = vm.categories.map { $0.name }
-        if let parsed = try? await OpenAIService.parseExpense(
+        let subManager = SubscriptionManager.shared
+        if subManager.canParseWithAI, let parsed = try? await OpenAIService.parseExpense(
             text:          trimmed,
             categoryNames: catNames,
             categories:    vm.categories
         ) {
+            subManager.recordParseUsage()
             applyParsed(parsed)
             return
         }

@@ -77,7 +77,7 @@ struct InsightsView: View {
                 .environmentObject(subManager)
         }
         .sheet(isPresented: $showPaywall, onDismiss: { paywallTriggerFeature = nil }) {
-            PaywallView(triggerFeature: paywallTriggerFeature)
+            RemoveAdsSheet()
                 .environmentObject(subManager)
         }
     }

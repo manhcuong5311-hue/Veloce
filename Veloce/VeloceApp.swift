@@ -16,6 +16,8 @@ struct VeloceApp: App {
 
     init() {
         FirebaseApp.configure()
+        // Ads run only while "Remove Ads" is not owned (former Pro buyers are ad-free).
+        AdsManager.shared.bind(isAdFree: SubscriptionManager.shared.$isAdFree)
         // Set currency and speech language from device locale on first install,
         // before any view renders so formatters always show the right symbol.
         if UserDefaults.standard.string(forKey: "veloce_currency") == nil {

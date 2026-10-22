@@ -1,6 +1,7 @@
 import SwiftUI
 import FirebaseAuth
 import UniformTypeIdentifiers
+import StoreKit
 
 // MARK: - SettingsView
 
@@ -89,7 +90,7 @@ struct SettingsView: View {
             }
         }
         .adaptiveSheet(isPresented: $showPaywall) {
-            PaywallView().environmentObject(subManager)
+            RemoveAdsSheet().environmentObject(subManager)
         }
         .adaptiveSheet(isPresented: $showShareSheet) {
             if let url = exportedFileURL { ShareSheet(activityItems: [url]) }
@@ -283,7 +284,7 @@ struct SettingsView: View {
                             .truncationMode(.middle)
                     }
                     Spacer()
-                    if subManager.isProUser {
+                    if subManager.hasLegacyPro {
                         Text(String(localized: "pro.badge"))
                             .font(.system(size: 9, weight: .black))
                             .foregroundStyle(.white)
@@ -306,10 +307,10 @@ struct SettingsView: View {
 
     private var premiumSection: some View {
         Section {
-            if subManager.isProUser {
+            if subManager.isAdFree {
                 HStack {
                     Label {
-                        Text("settings_premium_active")
+                        Text("settings_ad_free")
                             .foregroundStyle(VeloceTheme.ok)
                             .font(.system(size: 15, weight: .medium))
                     } icon: {
@@ -317,29 +318,65 @@ struct SettingsView: View {
                             .foregroundStyle(VeloceTheme.ok)
                     }
                     Spacer()
-                    Text("settings_pro_ai_limit")
-                        .font(.system(size: 12))
-                        .foregroundStyle(VeloceTheme.textTertiary)
                 }
             } else {
                 Button { showPaywall = true } label: {
                     HStack {
                         Label {
-                            Text("settings_upgrade_premium")
+                            Text("remove_ads_title")
                                 .font(.system(size: 15, weight: .semibold))
                                 .foregroundStyle(VeloceTheme.accent)
                         } icon: {
-                            Image(systemName: "sparkles")
+                            Image(systemName: "nosign")
                                 .foregroundStyle(VeloceTheme.accent)
                         }
                         Spacer()
-                        Text("settings_free_ai_limit")
+                        Text(subManager.removeAdsProduct?.displayPrice ?? "")
                             .font(.system(size: 12))
                             .foregroundStyle(VeloceTheme.textTertiary)
                         Image(systemName: "chevron.right")
                             .font(.system(size: 11, weight: .semibold))
                             .foregroundStyle(VeloceTheme.textTertiary)
                     }
+                }
+            }
+
+            // AI fair-use allowance (AI requests cost money per call).
+            HStack {
+                Label {
+                    Text(String(format: String(localized: "settings_ai_limit_fmt"),
+                                subManager.aiDailyLimit, subManager.parseDailyLimit))
+                        .font(.system(size: 14))
+                        .foregroundStyle(VeloceTheme.textSecondary)
+                } icon: {
+                    Image(systemName: "sparkles").foregroundStyle(VeloceTheme.accent)
+                }
+            }
+
+            // Still paying for the yearly plan that is no longer sold.
+            if subManager.hasActiveYearly {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("settings_legacy_sub_note")
+                        .font(.system(size: 13))
+                        .foregroundStyle(VeloceTheme.textSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Button {
+                        Task { await openManageSubscriptions() }
+                    } label: {
+                        Text("settings_manage_subscription")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(VeloceTheme.accent)
+                    }
+                    .buttonStyle(.borderless)
+                }
+                .padding(.vertical, 2)
+            }
+
+            if AdsManager.shared.privacyOptionsRequired && !subManager.isAdFree {
+                Button { AdsManager.shared.presentPrivacyOptions() } label: {
+                    Label("settings_ad_privacy", systemImage: "hand.raised.fill")
+                        .foregroundStyle(VeloceTheme.textSecondary)
+                        .font(.system(size: 14))
                 }
             }
 
@@ -370,13 +407,22 @@ struct SettingsView: View {
             }
 
         } header: {
-            sectionHeader("settings_premium", icon: "star.circle.fill")
-        } footer: {
-            if !subManager.isProUser {
-                Text("settings_premium_footer")
-                    .font(.system(size: 12))
-                    .foregroundStyle(VeloceTheme.textTertiary)
-            }
+            sectionHeader("settings_ads_section", icon: "star.circle.fill")
+        }
+    }
+
+    /// Legacy yearly subscribers can cancel from here (StoreKit sheet, or the
+    /// App Store subscriptions page as a fallback).
+    @MainActor
+    private func openManageSubscriptions() async {
+        if let scene = UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene }).first {
+            do {
+                try await AppStore.showManageSubscriptions(in: scene)
+                return
+            } catch {}
+        }
+        if let url = URL(string: "https://apps.apple.com/account/subscriptions") {
+            await UIApplication.shared.open(url)
         }
     }
 

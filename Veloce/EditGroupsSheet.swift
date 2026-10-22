@@ -111,7 +111,7 @@ struct EditGroupsSheet: View {
                 .environmentObject(subManager)
         }
         .adaptiveSheet(isPresented: $showPaywall) {
-            PaywallView().environmentObject(subManager)
+            RemoveAdsSheet().environmentObject(subManager)
         }
     }
 
@@ -268,7 +268,7 @@ private struct GroupEditSheet: View {
             IconPickerSheet(selectedIcon: $selectedIcon)
         }
         .adaptiveSheet(isPresented: $showPaywall) {
-            PaywallView().environmentObject(subManager)
+            RemoveAdsSheet().environmentObject(subManager)
         }
     }
 

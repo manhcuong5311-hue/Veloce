@@ -11,14 +11,16 @@ private enum ProductID {
 
 // MARK: - SubscriptionManager (StoreKit 2)
 //
+// Since 1.1 Veloce is free: every feature is unlocked for everyone and the
+// app is supported by AdMob ads. The former lifetime product is reused as the
+// one-time "Remove Ads" purchase; the yearly subscription is no longer sold.
+//
 // Responsibilities:
-//   • Fetch products from the App Store
-//   • Purchase lifecycle (success / userCancelled / pending)
-//   • Verify transactions via Transaction.currentEntitlements
-//   • Listen for out-of-band updates (renewals, revocations, Ask-to-Buy)
-//   • Restore via AppStore.sync()
-//   • Cache entitlement in UserDefaults for offline use
-//   • AI usage rate-limiting (free: 3/day, pro: 50/day)
+//   • `isAdFree` — Remove Ads / any past purchase (lifetime or yearly) → no ads
+//   • `hasLegacyPro` — people who paid for Pro keep their 50 AI/day:
+//       an active yearly subscription, or the lifetime bought before the switch
+//   • AI fair-use limits (chat 5/day, expense parsing 30/day; legacy Pro 50/100)
+//   • Purchase / restore of Remove Ads, out-of-band transaction updates
 
 @MainActor
 final class SubscriptionManager: ObservableObject {
@@ -27,36 +29,54 @@ final class SubscriptionManager: ObservableObject {
 
     // MARK: Published
 
-    @Published private(set) var isProUser:           Bool    = false
+    /// Every former Pro feature is free now. Kept so the many existing
+    /// `isProUser` checks simply resolve to "unlocked".
+    var isProUser: Bool { true }
+
+    /// No ads: owns Remove Ads (the lifetime product) or ever bought Pro.
+    @Published private(set) var isAdFree:            Bool    = false
+    /// Paid for Pro before the free switch → keeps the higher AI allowance.
+    @Published private(set) var hasLegacyPro:        Bool    = false
+    /// Still paying for the (no longer sold) yearly plan — shown a "you can cancel" note.
+    @Published private(set) var hasActiveYearly:     Bool    = false
     @Published private(set) var products:            [Product] = []
     @Published private(set) var isLoadingProducts:   Bool    = false
-    @Published              var errorMessage:        String? = nil   // consumed by PaywallView
+    @Published              var errorMessage:        String? = nil   // shown by RemoveAdsSheet
 
     // MARK: AI usage
 
     @Published private(set) var aiMessagesUsedToday: Int = 0
-    static let freeAILimit = 3
-    static let proAILimit  = 50  // hard cap shown in paywall as "50 AI / day"
+    @Published private(set) var aiParsesUsedToday:   Int = 0
+    static let freeAILimit    = 5
+    static let proAILimit     = 50   // legacy Pro; matches CHAT_HARD_LIMIT on the server
+    static let freeParseLimit = 30
+    static let proParseLimit  = 100  // matches PARSE_HARD_LIMIT on the server
 
-    var canUseAI: Bool {
-        isProUser
-            ? aiMessagesUsedToday < SubscriptionManager.proAILimit
-            : aiMessagesUsedToday < SubscriptionManager.freeAILimit
-    }
+    /// Lifetime purchases made before this date were "Pro" purchases.
+    private static let freeSwitchDate: Date =
+        Calendar(identifier: .gregorian).date(from: DateComponents(
+            timeZone: TimeZone(identifier: "UTC"), year: 2026, month: 10, day: 23)) ?? .distantFuture
 
-    /// Pro user who has hit the daily 50-message soft cap.
-    var isAtOptimalLimit: Bool {
-        isProUser && aiMessagesUsedToday >= SubscriptionManager.proAILimit
-    }
+    var aiDailyLimit: Int    { hasLegacyPro ? Self.proAILimit    : Self.freeAILimit }
+    var parseDailyLimit: Int { hasLegacyPro ? Self.proParseLimit : Self.freeParseLimit }
 
-    var freeAIRemaining: Int {
-        max(0, SubscriptionManager.freeAILimit - aiMessagesUsedToday)
-    }
+    var canUseAI: Bool { aiMessagesUsedToday < aiDailyLimit }
+
+    /// Daily AI chat allowance used up.
+    var isAtOptimalLimit: Bool { aiMessagesUsedToday >= aiDailyLimit }
+
+    var freeAIRemaining: Int { max(0, aiDailyLimit - aiMessagesUsedToday) }
+
+    /// Cloud (LLM) expense parsing still available today; the on-device parser
+    /// is used once this runs out.
+    var canParseWithAI: Bool { aiParsesUsedToday < parseDailyLimit }
 
     // MARK: Convenience product accessors
 
     var lifetimeProduct: Product? { products.first { $0.id == ProductID.lifetime } }
     var yearlyProduct:   Product? { products.first { $0.id == ProductID.yearly   } }
+    /// "Remove Ads" is the former lifetime product.
+    var removeAdsProduct: Product? { lifetimeProduct }
 
     // MARK: Private
 
@@ -64,13 +84,24 @@ final class SubscriptionManager: ObservableObject {
     private let proKey     = "veloce_is_pro"
     private let aiCountKey = "veloce_ai_count"
     private let aiDateKey  = "veloce_ai_date"
+    private let everPurchasedKey = "veloce_ever_purchased"
+    private let legacyProKey     = "veloce_legacy_pro"
+    private let parseCountKey    = "veloce_ai_parse_count"
 
     // MARK: Init
 
     init() {
         // Restore cached entitlement immediately so UI is correct while the
         // async entitlement check runs in the background.
-        isProUser           = UserDefaults.standard.bool(forKey: proKey)
+        let defaults = UserDefaults.standard
+        // Anyone the old app knew as Pro stays ad-free (and keeps 50 AI/day).
+        if defaults.bool(forKey: proKey) {
+            defaults.set(true, forKey: everPurchasedKey)
+            if defaults.object(forKey: legacyProKey) == nil { defaults.set(true, forKey: legacyProKey) }
+        }
+        isAdFree            = defaults.bool(forKey: everPurchasedKey)
+        hasLegacyPro        = defaults.bool(forKey: legacyProKey)
+        aiParsesUsedToday   = defaults.integer(forKey: parseCountKey)
         aiMessagesUsedToday = loadTodayAICount()
         transactionListener = listenForTransactions()
 
@@ -164,46 +195,10 @@ final class SubscriptionManager: ObservableObject {
         UserDefaults.standard.set(aiMessagesUsedToday, forKey: aiCountKey)
     }
 
-    // MARK: - 7-day install paywall trigger
-
-    private let installDateKey  = "veloce_install_date"
-    private let day7ShownKey    = "veloce_day7_paywall_shown"
-
-    /// True when the user has been installed for ≥7 days, is free, and hasn't
-    /// seen the install-anniversary paywall yet.
-    var shouldShowDay7Paywall: Bool {
-        guard !isProUser else { return false }
-        guard !UserDefaults.standard.bool(forKey: day7ShownKey) else { return false }
-        let days = Calendar.current.dateComponents([.day], from: installDate, to: Date()).day ?? 0
-        return days >= 7
-    }
-
-    func markDay7PaywallShown() {
-        UserDefaults.standard.set(true, forKey: day7ShownKey)
-    }
-
-    /// The date the app was first launched. Recorded on first call.
-    private var installDate: Date {
-        let ud  = UserDefaults.standard
-        let iso = ISO8601DateFormatter()
-        if let str = ud.string(forKey: installDateKey), let date = iso.date(from: str) {
-            return date
-        }
-        let now = Date()
-        ud.set(iso.string(from: now), forKey: installDateKey)
-        return now
-    }
-
-    // MARK: - Dev / Simulator helpers (no StoreKit config)
-
-    func mockUnlockPro() {
-        isProUser = true
-        UserDefaults.standard.set(true, forKey: proKey)
-    }
-
-    func mockRevokePro() {
-        isProUser = false
-        UserDefaults.standard.set(false, forKey: proKey)
+    func recordParseUsage() {
+        resetAICountIfNewDay()
+        aiParsesUsedToday += 1
+        UserDefaults.standard.set(aiParsesUsedToday, forKey: parseCountKey)
     }
 
     // MARK: - Private
@@ -225,29 +220,48 @@ final class SubscriptionManager: ObservableObject {
         }
     }
 
-    /// Scans `Transaction.currentEntitlements` for valid (non-revoked) purchases
-    /// and updates `isProUser` + the UserDefaults cache.
+    /// Scans the user's transactions and updates `isAdFree`, `hasLegacyPro`
+    /// and `hasActiveYearly` (+ their UserDefaults caches).
+    ///
+    /// Ad-free is sticky: anyone who ever bought the lifetime or the yearly
+    /// plan stays ad-free, even after the subscription ends. We never turn it
+    /// off just because nothing was found (offline / first launch).
     private func updateEntitlements() async {
-        var purchasedIDs = Set<String>()
-
+        var ownsLifetime = false, lifetimeIsLegacy = false, activeYearly = false
         for await result in Transaction.currentEntitlements {
-            do {
-                let tx = try checkVerified(result)
-                // A revoked transaction means the user got a refund or the
-                // subscription lapsed; exclude it.
-                if tx.revocationDate == nil {
-                    purchasedIDs.insert(tx.productID)
-                }
-            } catch {
-                // Unverified — skip.
+            guard let tx = try? checkVerified(result), tx.revocationDate == nil else { continue }
+            switch tx.productID {
+            case ProductID.lifetime:
+                ownsLifetime = true
+                if tx.originalPurchaseDate < Self.freeSwitchDate { lifetimeIsLegacy = true }
+            case ProductID.yearly:
+                activeYearly = true
+            default:
+                break
             }
         }
 
-        let isPro = purchasedIDs.contains(ProductID.lifetime) ||
-                    purchasedIDs.contains(ProductID.yearly)
-        isProUser = isPro
-        // Persist offline cache so the user keeps access without a network call.
-        UserDefaults.standard.set(isPro, forKey: proKey)
+        var everPurchased = ownsLifetime || activeYearly
+        if !everPurchased {
+            for await result in Transaction.all {
+                if let tx = try? checkVerified(result), ProductID.all.contains(tx.productID),
+                   tx.revocationDate == nil {
+                    everPurchased = true
+                    break
+                }
+            }
+        }
+
+        let defaults = UserDefaults.standard
+        if everPurchased {
+            isAdFree = true
+            defaults.set(true, forKey: everPurchasedKey)
+        }
+        hasActiveYearly = activeYearly
+        // Legacy Pro: a lifetime from the Pro era (permanent) or a running yearly plan.
+        if lifetimeIsLegacy { defaults.set(true, forKey: legacyProKey) }
+        if !ownsLifetime { defaults.set(false, forKey: legacyProKey) }
+        hasLegacyPro = activeYearly || defaults.bool(forKey: legacyProKey)
     }
 
     private func checkVerified<T>(_ result: VerificationResult<T>) throws -> T {
@@ -269,8 +283,10 @@ final class SubscriptionManager: ObservableObject {
         let stored = UserDefaults.standard.string(forKey: aiDateKey) ?? ""
         guard stored != today else { return }
         UserDefaults.standard.set(0,     forKey: aiCountKey)
+        UserDefaults.standard.set(0,     forKey: parseCountKey)
         UserDefaults.standard.set(today, forKey: aiDateKey)
         aiMessagesUsedToday = 0
+        aiParsesUsedToday   = 0
     }
 }
 
