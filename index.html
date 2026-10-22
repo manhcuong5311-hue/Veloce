@@ -639,7 +639,7 @@
       <div class="hero-meta">
         <span class="hero-meta-item">
           <span class="dot"></span>
-          Effective: April 12, 2026
+          Effective: October 22, 2026
         </span>
         <span class="hero-meta-item">
           <span class="dot" style="background:var(--accent)"></span>
@@ -696,9 +696,19 @@
             <td>On-device (UserDefaults)</td>
           </tr>
           <tr>
+            <td>Account</td>
+            <td>Email address or Sign in with Apple ID, user ID</td>
+            <td>Firebase Authentication (Google)</td>
+          </tr>
+          <tr>
             <td>AI query text</td>
-            <td>Natural-language expense input</td>
-            <td>Sent to OpenAI API, not stored</td>
+            <td>Natural-language expense input, assistant messages with a budget summary and recent expenses</td>
+            <td>Sent to OpenAI API via our server, not stored</td>
+          </tr>
+          <tr>
+            <td>Advertising data</td>
+            <td>Advertising identifier (only if you allow tracking), coarse location from IP, ad interactions, diagnostics</td>
+            <td>Google AdMob (only if you have not bought Remove Ads)</td>
           </tr>
           <tr>
             <td>Voice audio</td>
@@ -714,7 +724,7 @@
       </table>
 
       <div class="ok-box">
-        <p>✓ We never collect names, email addresses, contacts, location, or device identifiers for tracking purposes.</p>
+        <p>✓ We never sell your data. Your expenses, budgets and messages are never shared with advertisers. The advertising identifier is used for ads only if you allow tracking in the iOS prompt.</p>
       </div>
     </div>
 
@@ -729,10 +739,11 @@
         <li><strong>Expense tracking</strong> — store, display, and summarise your spending across categories and time periods.</li>
         <li><strong>Budget management</strong> — calculate remaining budgets, progress ratios, and over-budget alerts.</li>
         <li><strong>AI expense parsing</strong> — convert natural-language text (e.g. "lunch 80k") into structured expense entries via the OpenAI API.</li>
-        <li><strong>Subscription verification</strong> — validate your Pro entitlement through Apple's StoreKit to unlock premium features.</li>
-        <li><strong>Usage limits</strong> — track the number of AI messages used today (stored locally) to enforce the free-tier limit of 3 messages per day.</li>
+        <li><strong>Purchase verification</strong> — check through Apple's StoreKit whether you bought "Remove Ads" (or a former Pro plan) so ads are turned off.</li>
+        <li><strong>Usage limits</strong> — count AI requests per day (on your device and on our server) to enforce the fair-use limits: 5 AI assistant chats and 30 AI expense entries per day.</li>
+        <li><strong>Advertising</strong> — Veloce is free and shows ads from Google AdMob unless you buy "Remove Ads" (see section 5).</li>
       </ul>
-      <p>We do <strong>not</strong> use your data for advertising, profiling, or any purpose unrelated to the core app functionality.</p>
+      <p>We do <strong>not</strong> use your expenses, budgets or messages for advertising or profiling.</p>
     </div>
 
     <!-- 3 -->
@@ -750,7 +761,7 @@
       <p>Voice input is processed using Apple's on-device Speech Recognition framework (SFSpeechRecognizer). Audio is transcribed locally on your device before any text is handled. We never record, buffer, or upload raw audio to our own servers.</p>
 
       <div class="highlight-box">
-        <p>The AI receives only the expense text you type or speak — never your stored expense history, budget amounts, or personal details.</p>
+        <p>For expense parsing the AI receives only the text you type or speak. When you chat with the AI assistant, it also receives a summary of your budgets and your most recent expenses so it can answer questions about your spending. It never receives your name or email.</p>
       </div>
     </div>
 
@@ -764,7 +775,7 @@
       <ul class="list">
         <li><strong>Private</strong> — inaccessible to other apps due to iOS sandboxing.</li>
         <li><strong>Included in iCloud Backup</strong> — if you have iCloud Backup enabled, these files may be included in your personal backup, which is encrypted and controlled by your Apple ID.</li>
-        <li><strong>Not synced to our servers</strong> — Veloce has no backend or cloud database of its own.</li>
+        <li><strong>Not stored on our servers</strong> — our Firebase backend only handles sign-in and AI requests; it does not keep your expense records. Optional iCloud sync uses your own iCloud account.</li>
       </ul>
       <p>Write operations are dispatched to a background serial queue to protect data integrity. We strongly recommend enabling a device passcode and Face ID to protect your financial data.</p>
     </div>
@@ -778,10 +789,12 @@
       <p>Veloce integrates with the following third-party services. Each operates under its own privacy policy:</p>
       <ul class="list">
         <li><strong>OpenAI API</strong> — AI expense parsing. Text queries only. <a href="https://openai.com/policies/privacy-policy" style="color:var(--accent)">openai.com/policies/privacy-policy</a></li>
-        <li><strong>Apple StoreKit 2</strong> — in-app purchase validation for Pro subscriptions. Transaction data is managed by Apple. <a href="https://www.apple.com/legal/privacy/" style="color:var(--accent)">apple.com/legal/privacy</a></li>
+        <li><strong>Apple StoreKit 2</strong> — validation of the "Remove Ads" purchase. Transaction data is managed by Apple. <a href="https://www.apple.com/legal/privacy/" style="color:var(--accent)">apple.com/legal/privacy</a></li>
+        <li><strong>Firebase (Google)</strong> — sign-in and the server that forwards AI requests. <a href="https://firebase.google.com/support/privacy" style="color:var(--accent)">firebase.google.com/support/privacy</a></li>
+        <li><strong>Google AdMob</strong> — ads shown to users who have not bought "Remove Ads". AdMob may collect the advertising identifier (only with your tracking permission), IP-based coarse location, ad interactions and diagnostic data. In the EEA/UK a consent form lets you choose how your data is used, and you can change it any time in Settings → Ads &amp; Purchases → Ad privacy choices. <a href="https://policies.google.com/privacy" style="color:var(--accent)">policies.google.com/privacy</a></li>
         <li><strong>Apple Speech Framework</strong> — on-device speech-to-text for voice input.</li>
       </ul>
-      <p>We do not use analytics SDKs, crash-reporting services, advertising networks, or social login providers.</p>
+      <p>Apart from the services above we do not use other analytics, crash-reporting or advertising SDKs.</p>
     </div>
 
     <!-- 6 -->
@@ -842,7 +855,7 @@
       <div class="hero-meta">
         <span class="hero-meta-item">
           <span class="dot"></span>
-          Effective: April 12, 2026
+          Effective: October 22, 2026
         </span>
         <span class="hero-meta-item">
           <span class="dot" style="background:var(--accent)"></span>
@@ -857,8 +870,8 @@
       <ul class="toc-list">
         <li><a href="#t1">Acceptance</a></li>
         <li><a href="#t2">App Description</a></li>
-        <li><a href="#t3">Free vs. Pro</a></li>
-        <li><a href="#t4">Subscriptions &amp; Billing</a></li>
+        <li><a href="#t3">Free App &amp; AI Fair Use</a></li>
+        <li><a href="#t4">Remove Ads &amp; Billing</a></li>
         <li><a href="#t5">Acceptable Use</a></li>
         <li><a href="#t6">Intellectual Property</a></li>
         <li><a href="#t7">Disclaimers</a></li>
@@ -889,7 +902,7 @@
         <li><strong>Log expenses</strong> using natural-language text input, voice dictation, or manual entry.</li>
         <li><strong>Organise spending</strong> into colour-coded categories with individual budget limits.</li>
         <li><strong>Visualise budgets</strong> through animated column charts and a monthly progress overview.</li>
-        <li><strong>Use AI assistance</strong> to parse expense descriptions and receive spending insights (Pro feature).</li>
+        <li><strong>Use AI assistance</strong> to parse expense descriptions and receive spending insights, within a fair daily limit.</li>
         <li><strong>Set and track</strong> monthly income and saving goals.</li>
       </ul>
       <p>Veloce is a personal productivity tool. It is <strong>not</strong> a licensed financial advisory service, bank, or investment platform.</p>
@@ -899,65 +912,25 @@
     <div class="section-card" id="t3">
       <h2>
         <span class="icon icon-amber">🆓</span>
-        3. Free vs. Pro Access
+        3. Free App &amp; AI Fair Use
       </h2>
-      <p>Veloce offers two tiers of access:</p>
-
-      <table class="data-table">
-        <thead>
-          <tr>
-            <th>Feature</th>
-            <th>Free</th>
-            <th>Pro</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td>Expense logging</td>
-            <td>✓ Unlimited</td>
-            <td>✓ Unlimited</td>
-          </tr>
-          <tr>
-            <td>Budget categories</td>
-            <td>✓ Unlimited</td>
-            <td>✓ Unlimited</td>
-          </tr>
-          <tr>
-            <td>AI expense parsing</td>
-            <td>3 messages / day</td>
-            <td>✓ Unlimited</td>
-          </tr>
-          <tr>
-            <td>AI financial insights</td>
-            <td>—</td>
-            <td>✓ Full access</td>
-          </tr>
-          <tr>
-            <td>Voice input</td>
-            <td>✓</td>
-            <td>✓</td>
-          </tr>
-        </tbody>
-      </table>
-
-      <div class="highlight-box">
-        <p>The free tier is permanent — no time limit, no expiry. Pro features are unlocked via an in-app purchase.</p>
-      </div>
+      <p>Every feature of Veloce is free. The app is supported by ads.</p>
+      <ul class="list">
+        <li>AI has a fair daily limit because every request has a real cost: 5 AI assistant chats and 30 AI expense entries per day. After that the on-device parser keeps working without limits.</li>
+        <li>People who bought Pro before October 23, 2026 (lifetime, or a yearly plan while it is active) keep 50 AI chats a day.</li>
+      </ul>
     </div>
 
-    <!-- 4 -->
     <div class="section-card" id="t4">
       <h2>
         <span class="icon icon-green">💳</span>
-        4. Subscriptions &amp; Billing
+        4. Remove Ads &amp; Billing
       </h2>
-      <p>Pro access is available through two purchase options processed by Apple's App Store:</p>
       <ul class="list">
-        <li><strong>Yearly subscription</strong> (<code style="font-size:12px;background:var(--surface-raised);padding:2px 6px;border-radius:4px">com.veloce.yearly</code>) — billed annually. Auto-renews unless cancelled at least 24 hours before the renewal date.</li>
-        <li><strong>Lifetime purchase</strong> (<code style="font-size:12px;background:var(--surface-raised);padding:2px 6px;border-radius:4px">com.veloce.lifetime</code>) — one-time payment for permanent Pro access.</li>
+        <li><strong>Remove Ads</strong> (<code style="font-size:12px;background:var(--surface-raised);padding:2px 6px;border-radius:4px">com.veloce.lifetime</code>) — an optional one-time purchase that turns off all ads. It is not a subscription. Anyone who bought the former lifetime or yearly Pro plan is ad-free automatically.</li>
+        <li>The former yearly subscription (<code style="font-size:12px;background:var(--surface-raised);padding:2px 6px;border-radius:4px">com.veloce.yearly</code>) is no longer offered. Existing subscribers can cancel any time in <strong>Settings → [Your Name] → Subscriptions</strong>.</li>
       </ul>
-      <p>All billing, payment processing, refunds, and subscription management are handled exclusively by Apple. To manage or cancel a subscription, visit <strong>Settings → [Your Name] → Subscriptions</strong> on your device. We do not have access to your payment details.</p>
-      <p>Prices are displayed in the App Store in your local currency and may vary by region. We reserve the right to change pricing with reasonable notice.</p>
+      <p>All billing, payment processing and refunds are handled exclusively by Apple. We do not have access to your payment details. Prices are displayed in the App Store in your local currency and may vary by region.</p>
     </div>
 
     <!-- 5 -->
